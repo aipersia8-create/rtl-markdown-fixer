@@ -8,16 +8,25 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import rehypeSanitize from "rehype-sanitize";
 
-type HistoryItem = {
+type ChatEntry = {
+  id: string;
+  pairId: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: number;
+};
+
+type Conversation = {
   id: string;
   title: string;
-  content: string;
+  userContent: string;
+  assistantContent: string;
   createdAt: number;
   updatedAt: number;
   pinned: boolean;
 };
 
-const STORAGE_KEY = "persian-rtl-markdown-history-v2";
+const STORAGE_KEY = "persian-rtl-chat-history-v3";
 
 const sample = `English at the beginning نباید باعث شود کل جمله چپ‌به‌راست شود.
 
@@ -42,6 +51,8 @@ function greet(name: string) {
 - آیتم فارسی با کلمه English
 - لینک: https://example.com/docs/getting-started
 `;
+
+const introMessage = `سلام! متن فارسی، Markdown، کد، لینک یا فرمولت را بفرست. من خروجی را طوری نمایش می‌دهم که فارسی راست‌به‌چپ بماند و بخش‌های فنی مثل code، URL، email و LaTeX درست چپ‌به‌راست دیده شوند.`;
 
 const rtlRegex = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
 const ltrTokenRegex =
@@ -69,16 +80,17 @@ function prepareCopy(text: string) {
 }
 
 function makeTitle(content: string) {
-  const line = content
+  const firstLine = content
     .split("\n")
-    .map((item) => item.trim())
+    .map((line) => line.trim())
     .find(Boolean);
 
-  if (!line) return "متن بدون عنوان";
-  return line.length > 42 ? `${line.slice(0, 42)}...` : line;
+  if (!firstLine) return "گفت‌وگوی بدون عنوان";
+  return firstLine.length > 46 ? `${firstLine.slice(0, 46)}...` : firstLine;
 }
 
 function formatDate(value: number) {
+  if (!value) return "";
   return new Intl.DateTimeFormat("fa-IR", {
     month: "short",
     day: "numeric",
@@ -88,85 +100,74 @@ function formatDate(value: number) {
 }
 
 export default function Home() {
-  const [markdown, setMarkdown] = useState(sample);
+  const [draft, setDraft] = useState("");
   const [toast, setToast] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
-  const previewRef = useRef<HTMLDivElement>(null);
+  const [chatEntries, setChatEntries] = useState<ChatEntry[]>([
+    {
+      id: "intro",
+      pairId: "intro",
+      role: "assistant",
+      content: introMessage,
+      createdAt: 0
+    }
+  ]);
+
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const latestAssistant = useMemo(() => {
+    return [...chatEntries].reverse().find((entry) => entry.role === "assistant");
+  }, [chatEntries]);
 
   const stats = useMemo(() => {
-    const trimmed = markdown.trim();
+    const content = latestAssistant?.content ?? "";
+    const trimmed = content.trim();
+
     return {
-      chars: markdown.length,
-      lines: markdown ? markdown.split("\n").length : 0,
+      chats: conversations.length,
+      chars: content.length,
+      lines: content ? content.split("\n").length : 0,
       words: trimmed ? trimmed.split(/\s+/).length : 0
     };
-  }, [markdown]);
+  }, [conversations.length, latestAssistant?.content]);
 
-  const filteredHistory = useMemo(() => {
+  const filteredConversations = useMemo(() => {
     const q = query.trim().toLowerCase();
 
-    return history
+    return conversations
       .filter((item) => {
         if (!q) return true;
-        return item.title.toLowerCase().includes(q) || item.content.toLowerCase().includes(q);
+        return (
+          item.title.toLowerCase().includes(q) ||
+          item.userContent.toLowerCase().includes(q) ||
+          item.assistantContent.toLowerCase().includes(q)
+        );
       })
       .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt);
-  }, [history, query]);
+  }, [conversations, query]);
 
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(STORAGE_KEY);
-      if (saved) setHistory(JSON.parse(saved) as HistoryItem[]);
+      if (saved) setConversations(JSON.parse(saved) as Conversation[]);
     } catch {
-      setHistory([]);
+      setConversations([]);
     }
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(history.slice(0, 80)));
-  }, [history]);
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations.slice(0, 80)));
+  }, [conversations]);
 
   useEffect(() => {
-    const clean = markdown.trim();
-    if (!clean) return;
-
-    const timer = window.setTimeout(() => {
-      const now = Date.now();
-
-      setHistory((current) => {
-        if (activeId) {
-          return current.map((item) =>
-            item.id === activeId
-              ? {
-                  ...item,
-                  content: markdown,
-                  updatedAt: now
-                }
-              : item
-          );
-        }
-
-        const next: HistoryItem = {
-          id: makeId(),
-          title: makeTitle(markdown),
-          content: markdown,
-          createdAt: now,
-          updatedAt: now,
-          pinned: false
-        };
-
-        setActiveId(next.id);
-        return [next, ...current].slice(0, 80);
-      });
-    }, 1200);
-
-    return () => window.clearTimeout(timer);
-  }, [markdown, activeId]);
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [chatEntries]);
 
   async function copy(value: string, label: string) {
     await navigator.clipboard.writeText(value);
@@ -174,52 +175,121 @@ export default function Home() {
     window.setTimeout(() => setToast(""), 1600);
   }
 
-  function saveNow() {
-    const now = Date.now();
+  function createAssistantOutput(input: string) {
+    return input.trim();
+  }
 
-    const next: HistoryItem = {
+  function submitMessage(value?: string) {
+    const clean = (value ?? draft).trim();
+    if (!clean) return;
+
+    const now = Date.now();
+    const pairId = makeId();
+    const assistantOutput = createAssistantOutput(clean);
+
+    const userMessage: ChatEntry = {
       id: makeId(),
-      title: makeTitle(markdown),
-      content: markdown,
+      pairId,
+      role: "user",
+      content: clean,
+      createdAt: now
+    };
+
+    const assistantMessage: ChatEntry = {
+      id: makeId(),
+      pairId,
+      role: "assistant",
+      content: assistantOutput,
+      createdAt: now
+    };
+
+    const conversation: Conversation = {
+      id: pairId,
+      title: makeTitle(clean),
+      userContent: clean,
+      assistantContent: assistantOutput,
       createdAt: now,
       updatedAt: now,
       pinned: false
     };
 
-    setHistory((current) => [next, ...current].slice(0, 80));
-    setActiveId(next.id);
-    setToast("در تاریخچه ذخیره شد");
-    window.setTimeout(() => setToast(""), 1600);
+    setChatEntries((current) => {
+      const withoutIntro =
+        current.length === 1 && current[0]?.id === "intro" ? [] : current;
+      return [...withoutIntro, userMessage, assistantMessage];
+    });
+
+    setConversations((current) => [conversation, ...current].slice(0, 80));
+    setActiveConversationId(pairId);
+    setDraft("");
+    textareaRef.current?.focus();
   }
 
-  function openItem(item: HistoryItem) {
-    setMarkdown(item.content);
-    setActiveId(item.id);
+  function openSample() {
+    setDraft(sample);
+    textareaRef.current?.focus();
+  }
+
+  function clearChat() {
+    setChatEntries([
+      {
+        id: "intro",
+        pairId: "intro",
+        role: "assistant",
+        content: introMessage,
+        createdAt: 0
+      }
+    ]);
+    setActiveConversationId(null);
+    setDraft("");
+  }
+
+  function openConversation(item: Conversation) {
+    const created = item.updatedAt || item.createdAt;
+
+    setChatEntries([
+      {
+        id: `${item.id}-user`,
+        pairId: item.id,
+        role: "user",
+        content: item.userContent,
+        createdAt: created
+      },
+      {
+        id: `${item.id}-assistant`,
+        pairId: item.id,
+        role: "assistant",
+        content: item.assistantContent,
+        createdAt: created
+      }
+    ]);
+
+    setActiveConversationId(item.id);
     setHistoryOpen(false);
-    setToast("از تاریخچه باز شد");
+    setToast("گفت‌وگو باز شد");
     window.setTimeout(() => setToast(""), 1400);
   }
 
-  function deleteItem(id: string) {
-    setHistory((current) => current.filter((item) => item.id !== id));
-    if (activeId === id) setActiveId(null);
+  function deleteConversation(id: string) {
+    setConversations((current) => current.filter((item) => item.id !== id));
+    if (activeConversationId === id) setActiveConversationId(null);
   }
 
   function togglePin(id: string) {
-    setHistory((current) =>
+    setConversations((current) =>
       current.map((item) => (item.id === id ? { ...item, pinned: !item.pinned } : item))
     );
   }
 
-  function startRename(item: HistoryItem) {
+  function startRename(item: Conversation) {
     setRenamingId(item.id);
     setRenameValue(item.title);
   }
 
   function finishRename(id: string) {
-    const title = renameValue.trim() || "متن بدون عنوان";
+    const title = renameValue.trim() || "گفت‌وگوی بدون عنوان";
 
-    setHistory((current) =>
+    setConversations((current) =>
       current.map((item) =>
         item.id === id ? { ...item, title, updatedAt: Date.now() } : item
       )
@@ -252,134 +322,176 @@ export default function Home() {
   return (
     <main className="page">
       <div className="background" aria-hidden="true">
+        <div className="aurora aurora-one" />
+        <div className="aurora aurora-two" />
+        <div className="aurora aurora-three" />
         <div className="grid-floor" />
-        <div className="shape shape-1">{"{ }"}</div>
-        <div className="shape shape-2">∑</div>
-        <div className="shape shape-3">π</div>
-        <div className="shape shape-4">AI</div>
-        <div className="neural">
-          <span className="node n1" />
-          <span className="node n2" />
-          <span className="node n3" />
-          <span className="node n4" />
-          <span className="line l1" />
-          <span className="line l2" />
-          <span className="line l3" />
+
+        <div className="ring ring-one" />
+        <div className="ring ring-two" />
+
+        <div className="floating-chip chip-one">{"{ code }"}</div>
+        <div className="floating-chip chip-two">∑x²</div>
+        <div className="floating-chip chip-three">π</div>
+        <div className="floating-chip chip-four">AI</div>
+        <div className="floating-chip chip-five">RTL</div>
+
+        <div className="neural-map">
+          <span className="node node-a" />
+          <span className="node node-b" />
+          <span className="node node-c" />
+          <span className="node node-d" />
+          <span className="node node-e" />
+          <span className="edge edge-1" />
+          <span className="edge edge-2" />
+          <span className="edge edge-3" />
+          <span className="edge edge-4" />
         </div>
-        <div className="float-code code-1">const direction = &quot;rtl&quot;</div>
-        <div className="float-code code-2">E = mc²</div>
-        <div className="float-code code-3">Markdown.render()</div>
+
+        <div className="code-line code-line-one">const output = fixBidi(input)</div>
+        <div className="code-line code-line-two">E = mc²</div>
+        <div className="code-line code-line-three">Markdown + LaTeX + Code</div>
       </div>
 
-      <div className="shell">
-        <section className="hero">
-          <div className="hero-main">
-            <span className="badge">Persian RTL • Markdown • LaTeX • Code</span>
-            <h1>مرتب‌ساز متن فارسی برای خروجی هوش مصنوعی</h1>
-            <p className="lead">
-              متن فارسی را وارد کن و خروجی تمیز، خوانا و درست بگیر؛ کد، لینک، ایمیل،
-              مسیر فایل، عبارت‌های انگلیسی و فرمول‌های ریاضی بدون به‌هم‌ریختگی چپ‌به‌راست
-              نمایش داده می‌شوند.
-            </p>
-
-            <div className="hero-actions">
-              <button className="btn primary" onClick={() => setHistoryOpen(true)}>
-                باز کردن تاریخچه
-              </button>
-              <button className="btn" onClick={saveNow}>
-                ذخیره فعلی
-              </button>
-            </div>
+      <section className="app-shell">
+        <header className="topbar">
+          <div>
+            <span className="eyebrow">Persian RTL Assistant</span>
+            <h1>چت‌بات مرتب‌ساز متن فارسی</h1>
           </div>
 
-          <div className="stats-card">
-            <span>وضعیت متن</span>
+          <div className="top-actions">
+            <button className="btn ghost" onClick={() => setHistoryOpen(true)}>
+              تاریخچه
+              <span className="count">{conversations.length.toLocaleString("fa-IR")}</span>
+            </button>
+            <button className="btn ghost" onClick={clearChat}>
+              پاک کردن گفتگو
+            </button>
+          </div>
+        </header>
+
+        <div className="status-strip">
+          <div>
+            <span>گفت‌وگوها</span>
+            <strong>{stats.chats.toLocaleString("fa-IR")}</strong>
+          </div>
+          <div>
+            <span>کاراکتر خروجی</span>
             <strong>{stats.chars.toLocaleString("fa-IR")}</strong>
-            <small>کاراکتر</small>
+          </div>
+          <div>
+            <span>خط</span>
+            <strong>{stats.lines.toLocaleString("fa-IR")}</strong>
+          </div>
+          <div>
+            <span>کلمه</span>
+            <strong>{stats.words.toLocaleString("fa-IR")}</strong>
+          </div>
+        </div>
+
+        <section className="chat-window" aria-live="polite">
+          {chatEntries.map((entry) => (
+            <article
+              className={`message-row ${entry.role === "user" ? "from-user" : "from-assistant"}`}
+              key={entry.id}
+            >
+              <div className="avatar">
+                {entry.role === "user" ? "تو" : "RTL"}
+              </div>
+
+              <div className="message-bubble">
+                <div className="message-meta">
+                  <span>{entry.role === "user" ? "پیام تو" : "خروجی اصلاح‌شده"}</span>
+                  {entry.createdAt ? <time>{formatDate(entry.createdAt)}</time> : null}
+                </div>
+
+                {entry.role === "user" ? (
+                  <p className="user-text">{entry.content}</p>
+                ) : (
+                  <>
+                    <div className="assistant-summary">
+                      <span>Markdown</span>
+                      <span>LaTeX</span>
+                      <span>Code LTR</span>
+                      <span>Persian RTL</span>
+                    </div>
+
+                    <div className="rendered-output" id={`render-${entry.id}`}>
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm, remarkMath]}
+                        rehypePlugins={[rehypeSanitize, rehypeKatex]}
+                        components={components}
+                      >
+                        {entry.content}
+                      </ReactMarkdown>
+                    </div>
+
+                    <details className="raw-details">
+                      <summary>نمایش متن خام اصلاح‌شده</summary>
+                      <pre dir="rtl">{prepareCopy(entry.content)}</pre>
+                    </details>
+
+                    <div className="message-actions">
+                      <button className="btn primary" onClick={() => copy(prepareCopy(entry.content), "متن")}>
+                        کپی متن
+                      </button>
+                      <button className="btn" onClick={() => copy(entry.content, "Markdown")}>
+                        کپی Markdown
+                      </button>
+                      <button
+                        className="btn"
+                        onClick={() =>
+                          copy(
+                            document.getElementById(`render-${entry.id}`)?.innerHTML ?? "",
+                            "HTML"
+                          )
+                        }
+                      >
+                        کپی HTML
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </article>
+          ))}
+          <div ref={chatEndRef} />
+        </section>
+
+        <section className="composer-card">
+          <div className="composer-head">
             <div>
-              <b>{stats.lines.toLocaleString("fa-IR")} خط</b>
-              <b>{stats.words.toLocaleString("fa-IR")} کلمه</b>
+              <h2>پیامت را بفرست</h2>
+              <p>متن فارسی، Markdown، کد، لینک، ایمیل یا فرمول LaTeX را وارد کن.</p>
             </div>
+            <button className="btn ghost" onClick={openSample}>
+              نمونه
+            </button>
           </div>
-        </section>
 
-        <section className="workspace">
-          <div className="panel">
-            <div className="panel-head">
-              <div>
-                <h2>متن ورودی</h2>
-                <p>متن، Markdown، کد یا فرمول را اینجا قرار بده.</p>
-              </div>
-
-              <div className="actions">
-                <button
-                  className="btn"
-                  onClick={() => {
-                    setMarkdown(sample);
-                    setActiveId(null);
-                  }}
-                >
-                  نمونه
-                </button>
-                <button
-                  className="btn danger"
-                  onClick={() => {
-                    setMarkdown("");
-                    setActiveId(null);
-                  }}
-                >
-                  پاک کردن
-                </button>
-              </div>
-            </div>
-
+          <div className="composer">
             <textarea
-              value={markdown}
-              onChange={(event) => setMarkdown(event.target.value)}
+              ref={textareaRef}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+                  event.preventDefault();
+                  submitMessage();
+                }
+              }}
               spellCheck={false}
-              placeholder="متن فارسی، Markdown، کد یا فرمول را اینجا وارد کن..."
+              placeholder="اینجا بنویس... برای ارسال سریع Ctrl + Enter بزن"
             />
+            <button className="send-btn" onClick={() => submitMessage()}>
+              ارسال
+            </button>
           </div>
 
-          <div className="panel">
-            <div className="panel-head">
-              <div>
-                <h2>خروجی تمیز</h2>
-                <p>پیش‌نمایش زنده با جداسازی درست RTL و LTR.</p>
-              </div>
-
-              <div className="actions">
-                <button className="btn primary" onClick={() => copy(prepareCopy(markdown), "متن")}>
-                  کپی متن
-                </button>
-                <button className="btn" onClick={() => copy(markdown, "Markdown")}>
-                  کپی Markdown
-                </button>
-                <button className="btn" onClick={() => copy(previewRef.current?.innerHTML ?? "", "HTML")}>
-                  کپی HTML
-                </button>
-              </div>
-            </div>
-
-            <div className="preview" ref={previewRef}>
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm, remarkMath]}
-                rehypePlugins={[rehypeSanitize, rehypeKatex]}
-                components={components}
-              >
-                {markdown}
-              </ReactMarkdown>
-            </div>
-          </div>
+          <div className="toast">{toast}</div>
         </section>
-
-        <div className="toast">{toast}</div>
-      </div>
-
-      <button className="history-fab" onClick={() => setHistoryOpen(true)}>
-        تاریخچه
-        <span>{history.length.toLocaleString("fa-IR")}</span>
-      </button>
+      </section>
 
       {historyOpen && (
         <button
@@ -392,8 +504,8 @@ export default function Home() {
       <aside className={`drawer ${historyOpen ? "open" : ""}`} aria-hidden={!historyOpen}>
         <div className="drawer-head">
           <div>
-            <h2>تاریخچه</h2>
-            <p>ذخیره محلی روی همین مرورگر</p>
+            <h2>تاریخچه گفت‌وگوها</h2>
+            <p>همه چیز فقط روی همین مرورگر ذخیره می‌شود.</p>
           </div>
           <button className="close-btn" onClick={() => setHistoryOpen(false)}>
             ×
@@ -404,28 +516,28 @@ export default function Home() {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="جستجو در تاریخچه..."
+            placeholder="جستجو در گفت‌وگوها..."
           />
-          <button className="btn primary" onClick={saveNow}>
-            ذخیره
+          <button className="btn primary" onClick={() => setQuery("")}>
+            پاک کردن جستجو
           </button>
         </div>
 
         <div className="history-list">
-          {filteredHistory.length === 0 ? (
-            <div className="empty">
-              هنوز چیزی در تاریخچه نیست یا نتیجه‌ای برای جستجو پیدا نشد.
+          {filteredConversations.length === 0 ? (
+            <div className="empty-state">
+              هنوز گفت‌وگویی ذخیره نشده یا نتیجه‌ای برای جستجو پیدا نشد.
             </div>
           ) : (
-            filteredHistory.map((item) => (
+            filteredConversations.map((item) => (
               <article
+                className={`history-card ${activeConversationId === item.id ? "active" : ""}`}
                 key={item.id}
-                className={`history-item ${activeId === item.id ? "active" : ""}`}
               >
-                <div className="history-content" onClick={() => openItem(item)}>
+                <div className="history-content" onClick={() => openConversation(item)}>
                   {renamingId === item.id ? (
                     <input
-                      className="rename"
+                      className="rename-input"
                       value={renameValue}
                       onChange={(event) => setRenameValue(event.target.value)}
                       onClick={(event) => event.stopPropagation()}
@@ -438,7 +550,8 @@ export default function Home() {
                   ) : (
                     <h3>{item.pinned ? "★ " : ""}{item.title}</h3>
                   )}
-                  <p>{item.content.slice(0, 120)}</p>
+
+                  <p>{item.userContent.slice(0, 130)}</p>
                   <small>{formatDate(item.updatedAt)}</small>
                 </div>
 
@@ -449,13 +562,13 @@ export default function Home() {
                     </button>
                   ) : (
                     <button className="small-btn" onClick={() => startRename(item)}>
-                      نام
+                      تغییر نام
                     </button>
                   )}
                   <button className="small-btn" onClick={() => togglePin(item.id)}>
-                    {item.pinned ? "برداشتن" : "پین"}
+                    {item.pinned ? "برداشتن پین" : "پین"}
                   </button>
-                  <button className="small-btn danger" onClick={() => deleteItem(item.id)}>
+                  <button className="small-btn danger" onClick={() => deleteConversation(item.id)}>
                     حذف
                   </button>
                 </div>
