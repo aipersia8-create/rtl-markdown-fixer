@@ -4,8 +4,8 @@ import "katex/dist/katex.min.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "RTL Markdown Fixer",
-  description: "Clean RTL Persian and Arabic Markdown with safe LTR code, links and math."
+  title: "Persian RTL Markdown Fixer",
+  description: "Clean Persian RTL Markdown with safe LTR code, links and math."
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
