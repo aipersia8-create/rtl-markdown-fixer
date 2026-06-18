@@ -1,0 +1,1154 @@
+name: Upgrade UI V2
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/upgrade-ui-v2.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write upgraded app
+        run: |
+          mkdir -p app
+
+          cat > app/layout.tsx <<'EOF_LAYOUT'
+          import type { Metadata } from "next";
+          import type { ReactNode } from "react";
+          import "katex/dist/katex.min.css";
+          import "./globals.css";
+
+          export const metadata: Metadata = {
+            title: "Persian RTL Markdown Fixer",
+            description: "Clean Persian RTL Markdown with safe LTR code, links and math."
+          };
+
+          export default function RootLayout({ children }: { children: ReactNode }) {
+            return (
+              <html lang="fa" dir="rtl">
+                <body>{children}</body>
+              </html>
+            );
+          }
+          EOF_LAYOUT
+
+          cat > app/page.tsx <<'EOF_PAGE'
+          "use client";
+
+          import React, { useEffect, useMemo, useRef, useState } from "react";
+          import type { Components } from "react-markdown";
+          import ReactMarkdown from "react-markdown";
+          import remarkGfm from "remark-gfm";
+          import remarkMath from "remark-math";
+          import rehypeKatex from "rehype-katex";
+          import rehypeSanitize from "rehype-sanitize";
+
+          type HistoryItem = {
+            id: string;
+            title: string;
+            content: string;
+            createdAt: number;
+            updatedAt: number;
+            pinned: boolean;
+          };
+
+          const STORAGE_KEY = "persian-rtl-markdown-history-v2";
+
+          const sample = `English at the beginning نباید باعث شود کل جمله چپ‌به‌راست شود.
+
+          این یک متن فارسی است که وسطش API, React, Next.js, file/path/example.ts و email@example.com داریم.
+
+          فرمول inline: $E = mc^2$
+
+          فرمول بلاکی:
+
+          $$
+          \\int_0^1 x^2 dx = \\frac{1}{3}
+          $$
+
+          کد باید چپ‌به‌راست بماند:
+
+          \`\`\`ts
+          function greet(name: string) {
+            return \`Hello \${name}\`;
+          }
+          \`\`\`
+
+          - آیتم فارسی با کلمه English
+          - لینک: https://example.com/docs/getting-started
+          `;
+
+          const rtlRegex = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+          const ltrTokenRegex =
+            /(```[\s\S]*?```|`[^`]*`|https?:\/\/[^\s]+|www\.[^\s]+|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|[A-Za-z]:\\[^\s]+|\/[A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=%-]+|[A-Za-z][A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=%-]{1,})/g;
+
+          function makeId() {
+            return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+          }
+
+          function collectText(node: React.ReactNode): string {
+            if (typeof node === "string" || typeof node === "number") return String(node);
+            if (Array.isArray(node)) return node.map(collectText).join("");
+            if (React.isValidElement<{ children?: React.ReactNode }>(node)) {
+              return collectText(node.props.children);
+            }
+            return "";
+          }
+
+          function dirFrom(children: React.ReactNode): "rtl" | "ltr" {
+            return rtlRegex.test(collectText(children)) ? "rtl" : "ltr";
+          }
+
+          function prepareCopy(text: string) {
+            return text.normalize("NFC").replace(ltrTokenRegex, (match) => `\u2066${match}\u2069`);
+          }
+
+          function makeTitle(content: string) {
+            const line = content
+              .split("\n")
+              .map((item) => item.trim())
+              .find(Boolean);
+
+            if (!line) return "متن بدون عنوان";
+            return line.length > 42 ? `${line.slice(0, 42)}...` : line;
+          }
+
+          function formatDate(value: number) {
+            return new Intl.DateTimeFormat("fa-IR", {
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit"
+            }).format(value);
+          }
+
+          export default function Home() {
+            const [markdown, setMarkdown] = useState(sample);
+            const [toast, setToast] = useState("");
+            const [historyOpen, setHistoryOpen] = useState(false);
+            const [history, setHistory] = useState<HistoryItem[]>([]);
+            const [activeId, setActiveId] = useState<string | null>(null);
+            const [query, setQuery] = useState("");
+            const [renamingId, setRenamingId] = useState<string | null>(null);
+            const [renameValue, setRenameValue] = useState("");
+            const previewRef = useRef<HTMLDivElement>(null);
+
+            const stats = useMemo(() => {
+              const trimmed = markdown.trim();
+              return {
+                chars: markdown.length,
+                lines: markdown ? markdown.split("\n").length : 0,
+                words: trimmed ? trimmed.split(/\s+/).length : 0
+              };
+            }, [markdown]);
+
+            const filteredHistory = useMemo(() => {
+              const q = query.trim().toLowerCase();
+
+              return history
+                .filter((item) => {
+                  if (!q) return true;
+                  return item.title.toLowerCase().includes(q) || item.content.toLowerCase().includes(q);
+                })
+                .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt);
+            }, [history, query]);
+
+            useEffect(() => {
+              try {
+                const saved = window.localStorage.getItem(STORAGE_KEY);
+                if (saved) setHistory(JSON.parse(saved) as HistoryItem[]);
+              } catch {
+                setHistory([]);
+              }
+            }, []);
+
+            useEffect(() => {
+              window.localStorage.setItem(STORAGE_KEY, JSON.stringify(history.slice(0, 80)));
+            }, [history]);
+
+            useEffect(() => {
+              const clean = markdown.trim();
+              if (!clean) return;
+
+              const timer = window.setTimeout(() => {
+                const now = Date.now();
+
+                setHistory((current) => {
+                  if (activeId) {
+                    return current.map((item) =>
+                      item.id === activeId
+                        ? {
+                            ...item,
+                            content: markdown,
+                            updatedAt: now
+                          }
+                        : item
+                    );
+                  }
+
+                  const next: HistoryItem = {
+                    id: makeId(),
+                    title: makeTitle(markdown),
+                    content: markdown,
+                    createdAt: now,
+                    updatedAt: now,
+                    pinned: false
+                  };
+
+                  setActiveId(next.id);
+                  return [next, ...current].slice(0, 80);
+                });
+              }, 1200);
+
+              return () => window.clearTimeout(timer);
+            }, [markdown, activeId]);
+
+            async function copy(value: string, label: string) {
+              await navigator.clipboard.writeText(value);
+              setToast(`${label} کپی شد`);
+              window.setTimeout(() => setToast(""), 1600);
+            }
+
+            function saveNow() {
+              const now = Date.now();
+
+              const next: HistoryItem = {
+                id: makeId(),
+                title: makeTitle(markdown),
+                content: markdown,
+                createdAt: now,
+                updatedAt: now,
+                pinned: false
+              };
+
+              setHistory((current) => [next, ...current].slice(0, 80));
+              setActiveId(next.id);
+              setToast("در تاریخچه ذخیره شد");
+              window.setTimeout(() => setToast(""), 1600);
+            }
+
+            function openItem(item: HistoryItem) {
+              setMarkdown(item.content);
+              setActiveId(item.id);
+              setHistoryOpen(false);
+              setToast("از تاریخچه باز شد");
+              window.setTimeout(() => setToast(""), 1400);
+            }
+
+            function deleteItem(id: string) {
+              setHistory((current) => current.filter((item) => item.id !== id));
+              if (activeId === id) setActiveId(null);
+            }
+
+            function togglePin(id: string) {
+              setHistory((current) =>
+                current.map((item) => (item.id === id ? { ...item, pinned: !item.pinned } : item))
+              );
+            }
+
+            function startRename(item: HistoryItem) {
+              setRenamingId(item.id);
+              setRenameValue(item.title);
+            }
+
+            function finishRename(id: string) {
+              const title = renameValue.trim() || "متن بدون عنوان";
+
+              setHistory((current) =>
+                current.map((item) =>
+                  item.id === id ? { ...item, title, updatedAt: Date.now() } : item
+                )
+              );
+
+              setRenamingId(null);
+              setRenameValue("");
+            }
+
+            const components: Components = {
+              p: ({ children }) => <p dir={dirFrom(children)}>{children}</p>,
+              li: ({ children }) => <li dir={dirFrom(children)}>{children}</li>,
+              h1: ({ children }) => <h1 dir={dirFrom(children)}>{children}</h1>,
+              h2: ({ children }) => <h2 dir={dirFrom(children)}>{children}</h2>,
+              h3: ({ children }) => <h3 dir={dirFrom(children)}>{children}</h3>,
+              blockquote: ({ children }) => <blockquote dir={dirFrom(children)}>{children}</blockquote>,
+              a: ({ children, href }) => (
+                <a href={href} dir="ltr" target="_blank" rel="noreferrer">
+                  {children}
+                </a>
+              ),
+              code: ({ children, className }) => (
+                <code className={className} dir="ltr">
+                  {children}
+                </code>
+              ),
+              pre: ({ children }) => <pre dir="ltr">{children}</pre>
+            };
+
+            return (
+              <main className="page">
+                <div className="background" aria-hidden="true">
+                  <div className="grid-floor" />
+                  <div className="shape shape-1">{"{ }"}</div>
+                  <div className="shape shape-2">∑</div>
+                  <div className="shape shape-3">π</div>
+                  <div className="shape shape-4">AI</div>
+                  <div className="neural">
+                    <span className="node n1" />
+                    <span className="node n2" />
+                    <span className="node n3" />
+                    <span className="node n4" />
+                    <span className="line l1" />
+                    <span className="line l2" />
+                    <span className="line l3" />
+                  </div>
+                  <div className="float-code code-1">const direction = &quot;rtl&quot;</div>
+                  <div className="float-code code-2">E = mc²</div>
+                  <div className="float-code code-3">Markdown.render()</div>
+                </div>
+
+                <div className="shell">
+                  <section className="hero">
+                    <div className="hero-main">
+                      <span className="badge">Persian RTL • Markdown • LaTeX • Code</span>
+                      <h1>مرتب‌ساز متن فارسی برای خروجی هوش مصنوعی</h1>
+                      <p className="lead">
+                        متن فارسی را وارد کن و خروجی تمیز، خوانا و درست بگیر؛ کد، لینک، ایمیل،
+                        مسیر فایل، عبارت‌های انگلیسی و فرمول‌های ریاضی بدون به‌هم‌ریختگی چپ‌به‌راست
+                        نمایش داده می‌شوند.
+                      </p>
+
+                      <div className="hero-actions">
+                        <button className="btn primary" onClick={() => setHistoryOpen(true)}>
+                          باز کردن تاریخچه
+                        </button>
+                        <button className="btn" onClick={saveNow}>
+                          ذخیره فعلی
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="stats-card">
+                      <span>وضعیت متن</span>
+                      <strong>{stats.chars.toLocaleString("fa-IR")}</strong>
+                      <small>کاراکتر</small>
+                      <div>
+                        <b>{stats.lines.toLocaleString("fa-IR")} خط</b>
+                        <b>{stats.words.toLocaleString("fa-IR")} کلمه</b>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="workspace">
+                    <div className="panel">
+                      <div className="panel-head">
+                        <div>
+                          <h2>متن ورودی</h2>
+                          <p>متن، Markdown، کد یا فرمول را اینجا قرار بده.</p>
+                        </div>
+
+                        <div className="actions">
+                          <button
+                            className="btn"
+                            onClick={() => {
+                              setMarkdown(sample);
+                              setActiveId(null);
+                            }}
+                          >
+                            نمونه
+                          </button>
+                          <button
+                            className="btn danger"
+                            onClick={() => {
+                              setMarkdown("");
+                              setActiveId(null);
+                            }}
+                          >
+                            پاک کردن
+                          </button>
+                        </div>
+                      </div>
+
+                      <textarea
+                        value={markdown}
+                        onChange={(event) => setMarkdown(event.target.value)}
+                        spellCheck={false}
+                        placeholder="متن فارسی، Markdown، کد یا فرمول را اینجا وارد کن..."
+                      />
+                    </div>
+
+                    <div className="panel">
+                      <div className="panel-head">
+                        <div>
+                          <h2>خروجی تمیز</h2>
+                          <p>پیش‌نمایش زنده با جداسازی درست RTL و LTR.</p>
+                        </div>
+
+                        <div className="actions">
+                          <button className="btn primary" onClick={() => copy(prepareCopy(markdown), "متن")}>
+                            کپی متن
+                          </button>
+                          <button className="btn" onClick={() => copy(markdown, "Markdown")}>
+                            کپی Markdown
+                          </button>
+                          <button className="btn" onClick={() => copy(previewRef.current?.innerHTML ?? "", "HTML")}>
+                            کپی HTML
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="preview" ref={previewRef}>
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm, remarkMath]}
+                          rehypePlugins={[rehypeSanitize, rehypeKatex]}
+                          components={components}
+                        >
+                          {markdown}
+                        </ReactMarkdown>
+                      </div>
+                    </div>
+                  </section>
+
+                  <div className="toast">{toast}</div>
+                </div>
+
+                <button className="history-fab" onClick={() => setHistoryOpen(true)}>
+                  تاریخچه
+                  <span>{history.length.toLocaleString("fa-IR")}</span>
+                </button>
+
+                {historyOpen && (
+                  <button
+                    className="drawer-backdrop"
+                    onClick={() => setHistoryOpen(false)}
+                    aria-label="بستن تاریخچه"
+                  />
+                )}
+
+                <aside className={`drawer ${historyOpen ? "open" : ""}`} aria-hidden={!historyOpen}>
+                  <div className="drawer-head">
+                    <div>
+                      <h2>تاریخچه</h2>
+                      <p>ذخیره محلی روی همین مرورگر</p>
+                    </div>
+                    <button className="close-btn" onClick={() => setHistoryOpen(false)}>
+                      ×
+                    </button>
+                  </div>
+
+                  <div className="drawer-tools">
+                    <input
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      placeholder="جستجو در تاریخچه..."
+                    />
+                    <button className="btn primary" onClick={saveNow}>
+                      ذخیره
+                    </button>
+                  </div>
+
+                  <div className="history-list">
+                    {filteredHistory.length === 0 ? (
+                      <div className="empty">
+                        هنوز چیزی در تاریخچه نیست یا نتیجه‌ای برای جستجو پیدا نشد.
+                      </div>
+                    ) : (
+                      filteredHistory.map((item) => (
+                        <article
+                          key={item.id}
+                          className={`history-item ${activeId === item.id ? "active" : ""}`}
+                        >
+                          <div className="history-content" onClick={() => openItem(item)}>
+                            {renamingId === item.id ? (
+                              <input
+                                className="rename"
+                                value={renameValue}
+                                onChange={(event) => setRenameValue(event.target.value)}
+                                onClick={(event) => event.stopPropagation()}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter") finishRename(item.id);
+                                  if (event.key === "Escape") setRenamingId(null);
+                                }}
+                                autoFocus
+                              />
+                            ) : (
+                              <h3>{item.pinned ? "★ " : ""}{item.title}</h3>
+                            )}
+                            <p>{item.content.slice(0, 120)}</p>
+                            <small>{formatDate(item.updatedAt)}</small>
+                          </div>
+
+                          <div className="history-actions">
+                            {renamingId === item.id ? (
+                              <button className="small-btn" onClick={() => finishRename(item.id)}>
+                                ثبت
+                              </button>
+                            ) : (
+                              <button className="small-btn" onClick={() => startRename(item)}>
+                                نام
+                              </button>
+                            )}
+                            <button className="small-btn" onClick={() => togglePin(item.id)}>
+                              {item.pinned ? "برداشتن" : "پین"}
+                            </button>
+                            <button className="small-btn danger" onClick={() => deleteItem(item.id)}>
+                              حذف
+                            </button>
+                          </div>
+                        </article>
+                      ))
+                    )}
+                  </div>
+                </aside>
+              </main>
+            );
+          }
+          EOF_PAGE
+
+          cat > app/globals.css <<'EOF_CSS'
+          :root {
+            color-scheme: dark;
+            --bg: #050712;
+            --panel: rgba(8, 13, 30, 0.72);
+            --panel-2: rgba(255, 255, 255, 0.09);
+            --text: #eef4ff;
+            --muted: #a9b4cf;
+            --border: rgba(255, 255, 255, 0.15);
+            --accent: #8b5cf6;
+            --accent-2: #22d3ee;
+            --danger: #fb7185;
+          }
+
+          * {
+            box-sizing: border-box;
+          }
+
+          html,
+          body {
+            margin: 0;
+            min-height: 100%;
+            background: var(--bg);
+            color: var(--text);
+            font-family: Tahoma, Arial, sans-serif;
+            overflow-x: hidden;
+          }
+
+          button,
+          textarea,
+          input {
+            font: inherit;
+          }
+
+          button {
+            cursor: pointer;
+          }
+
+          .page {
+            position: relative;
+            min-height: 100vh;
+            padding: 28px 16px 76px;
+            overflow: hidden;
+          }
+
+          .background {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            perspective: 900px;
+            background:
+              radial-gradient(circle at 18% 12%, rgba(139, 92, 246, 0.34), transparent 28rem),
+              radial-gradient(circle at 84% 20%, rgba(34, 211, 238, 0.24), transparent 32rem),
+              radial-gradient(circle at 48% 88%, rgba(20, 241, 149, 0.1), transparent 28rem),
+              linear-gradient(135deg, #03050d, #080c19 44%, #050712);
+          }
+
+          .grid-floor {
+            position: absolute;
+            inset: -20%;
+            background-image:
+              linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px);
+            background-size: 72px 72px;
+            transform: rotateX(62deg) translateY(190px) scale(1.35);
+            animation: floorMove 12s ease-in-out infinite alternate;
+            mask-image: radial-gradient(circle at center, black, transparent 75%);
+          }
+
+          .shape {
+            position: absolute;
+            display: grid;
+            place-items: center;
+            width: 86px;
+            height: 86px;
+            border: 1px solid rgba(255,255,255,0.18);
+            border-radius: 24px;
+            background: rgba(255,255,255,0.08);
+            box-shadow: 0 0 60px rgba(34,211,238,0.16);
+            backdrop-filter: blur(16px);
+            color: rgba(255,255,255,0.72);
+            font-weight: 900;
+            direction: ltr;
+            animation: float3d 8s ease-in-out infinite alternate;
+          }
+
+          .shape-1 { top: 26%; right: 8%; }
+          .shape-2 { top: 62%; right: 17%; animation-delay: -2s; }
+          .shape-3 { top: 28%; left: 18%; animation-delay: -4s; }
+          .shape-4 { bottom: 14%; left: 30%; animation-delay: -6s; }
+
+          .neural {
+            position: absolute;
+            top: 46%;
+            left: 50%;
+            width: 390px;
+            height: 230px;
+            transform: translate(-50%, -50%) rotateX(56deg) rotateZ(-15deg);
+            opacity: 0.58;
+          }
+
+          .node {
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #67e8f9;
+            box-shadow: 0 0 24px #22d3ee;
+          }
+
+          .n1 { top: 18px; left: 26px; }
+          .n2 { top: 90px; left: 150px; background: #a78bfa; box-shadow: 0 0 24px #8b5cf6; }
+          .n3 { bottom: 36px; left: 88px; }
+          .n4 { top: 50px; right: 72px; background: #86efac; box-shadow: 0 0 24px #14f195; }
+
+          .line {
+            position: absolute;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(103,232,249,0.75), transparent);
+            transform-origin: left;
+          }
+
+          .l1 { width: 150px; top: 54px; left: 38px; transform: rotate(27deg); }
+          .l2 { width: 170px; top: 105px; left: 162px; transform: rotate(-18deg); }
+          .l3 { width: 150px; top: 168px; left: 100px; transform: rotate(-47deg); }
+
+          .float-code {
+            position: absolute;
+            direction: ltr;
+            font-family: Consolas, Monaco, monospace;
+            color: rgba(226,232,240,0.22);
+            font-size: 14px;
+            transform: rotate(-9deg);
+            animation: codeMove 10s ease-in-out infinite alternate;
+          }
+
+          .code-1 { top: 22%; left: 6%; }
+          .code-2 { bottom: 28%; right: 8%; animation-delay: -3s; }
+          .code-3 { top: 74%; left: 44%; animation-delay: -6s; }
+
+          .shell {
+            position: relative;
+            z-index: 2;
+            max-width: 1320px;
+            margin: 0 auto;
+          }
+
+          .hero {
+            display: grid;
+            grid-template-columns: 1fr 250px;
+            gap: 18px;
+            margin-bottom: 18px;
+          }
+
+          .hero-main,
+          .stats-card,
+          .panel,
+          .drawer {
+            border: 1px solid var(--border);
+            background: linear-gradient(135deg, rgba(255,255,255,0.11), rgba(255,255,255,0.04));
+            backdrop-filter: blur(22px);
+            box-shadow: 0 24px 90px rgba(0,0,0,0.42);
+          }
+
+          .hero-main {
+            border-radius: 30px;
+            padding: 28px;
+          }
+
+          .badge {
+            display: inline-flex;
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(139,92,246,0.42);
+            background: rgba(139,92,246,0.17);
+            color: #dbeafe;
+            font-size: 13px;
+          }
+
+          h1 {
+            margin: 16px 0 10px;
+            font-size: clamp(31px, 5vw, 60px);
+            line-height: 1.12;
+            letter-spacing: -0.04em;
+          }
+
+          .lead {
+            max-width: 850px;
+            margin: 0;
+            color: var(--muted);
+            line-height: 2;
+            font-size: 17px;
+          }
+
+          .hero-actions,
+          .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 9px;
+          }
+
+          .hero-actions {
+            margin-top: 22px;
+          }
+
+          .stats-card {
+            border-radius: 30px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+          }
+
+          .stats-card span,
+          .stats-card small,
+          .panel-head p {
+            color: var(--muted);
+          }
+
+          .stats-card strong {
+            margin-top: 10px;
+            font-size: 48px;
+            line-height: 1;
+            direction: ltr;
+            text-align: right;
+          }
+
+          .stats-card div {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 9px;
+            margin-top: 16px;
+          }
+
+          .stats-card b {
+            padding: 7px 10px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.08);
+            font-size: 13px;
+          }
+
+          .workspace {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+          }
+
+          .panel {
+            min-height: 680px;
+            border-radius: 26px;
+            overflow: hidden;
+          }
+
+          .panel-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 15px 16px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(255,255,255,0.055);
+          }
+
+          .panel-head h2 {
+            margin: 0;
+            font-size: 16px;
+          }
+
+          .panel-head p {
+            margin: 6px 0 0;
+            font-size: 13px;
+          }
+
+          .btn,
+          .small-btn,
+          .close-btn {
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: var(--panel-2);
+            color: var(--text);
+            padding: 9px 12px;
+            transition: 0.18s ease;
+          }
+
+          .btn:hover,
+          .small-btn:hover,
+          .close-btn:hover {
+            transform: translateY(-1px);
+            border-color: rgba(34,211,238,0.75);
+          }
+
+          .btn.primary {
+            border: 0;
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            color: white;
+          }
+
+          .danger {
+            color: #fecdd3;
+            border-color: rgba(251,113,133,0.35);
+          }
+
+          textarea {
+            width: 100%;
+            height: calc(100% - 74px);
+            min-height: 604px;
+            resize: vertical;
+            border: 0;
+            outline: 0;
+            padding: 22px;
+            background: rgba(0,0,0,0.2);
+            color: var(--text);
+            line-height: 2;
+            font-size: 16px;
+            direction: rtl;
+            unicode-bidi: plaintext;
+          }
+
+          .preview {
+            min-height: 604px;
+            padding: 22px;
+            line-height: 2;
+            overflow-wrap: anywhere;
+          }
+
+          .preview :where(p, li, blockquote, h1, h2, h3, h4, h5, h6) {
+            text-align: start;
+            unicode-bidi: plaintext;
+          }
+
+          .preview :where(pre, code, kbd, samp, .katex, .katex-display) {
+            direction: ltr !important;
+            unicode-bidi: isolate !important;
+            text-align: left;
+            font-family: Consolas, Monaco, "Courier New", monospace;
+          }
+
+          .preview pre {
+            overflow: auto;
+            padding: 16px;
+            border-radius: 16px;
+            background: rgba(0,0,0,0.48);
+            border: 1px solid var(--border);
+            line-height: 1.75;
+          }
+
+          .preview code {
+            padding: 2px 6px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.1);
+          }
+
+          .preview pre code {
+            padding: 0;
+            background: transparent;
+          }
+
+          .preview a {
+            direction: ltr;
+            unicode-bidi: isolate;
+            color: #67e8f9;
+          }
+
+          .toast {
+            position: relative;
+            z-index: 3;
+            margin-top: 14px;
+            color: #bbf7d0;
+            min-height: 24px;
+          }
+
+          .history-fab {
+            position: fixed;
+            z-index: 10;
+            right: 22px;
+            bottom: 22px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border: 0;
+            border-radius: 999px;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, rgba(139,92,246,0.95), rgba(34,211,238,0.86));
+            color: white;
+            box-shadow: 0 14px 50px rgba(0,0,0,0.34);
+          }
+
+          .history-fab span {
+            display: grid;
+            place-items: center;
+            min-width: 24px;
+            height: 24px;
+            border-radius: 999px;
+            background: rgba(0,0,0,0.22);
+            direction: ltr;
+          }
+
+          .drawer-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 20;
+            border: 0;
+            background: rgba(0,0,0,0.48);
+            backdrop-filter: blur(5px);
+          }
+
+          .drawer {
+            position: fixed;
+            z-index: 21;
+            top: 16px;
+            bottom: 16px;
+            right: 16px;
+            width: min(440px, calc(100vw - 32px));
+            border-radius: 28px;
+            padding: 18px;
+            transform: translateX(calc(100% + 30px));
+            transition: transform 0.28s ease;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+          }
+
+          .drawer.open {
+            transform: translateX(0);
+          }
+
+          .drawer-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid var(--border);
+          }
+
+          .drawer-head h2 {
+            margin: 0;
+            font-size: 24px;
+          }
+
+          .drawer-head p {
+            margin: 5px 0 0;
+            color: var(--muted);
+            font-size: 13px;
+          }
+
+          .close-btn {
+            width: 38px;
+            height: 38px;
+            padding: 0;
+            font-size: 26px;
+            line-height: 1;
+          }
+
+          .drawer-tools {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            padding: 14px 0;
+          }
+
+          .drawer-tools input,
+          .rename {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            outline: 0;
+            background: rgba(0,0,0,0.22);
+            color: var(--text);
+            padding: 11px 12px;
+          }
+
+          .history-list {
+            overflow: auto;
+            display: grid;
+            gap: 10px;
+            padding-left: 4px;
+          }
+
+          .history-item {
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 18px;
+            background: rgba(255,255,255,0.065);
+            padding: 12px;
+            transition: 0.18s ease;
+          }
+
+          .history-item.active,
+          .history-item:hover {
+            border-color: rgba(34,211,238,0.5);
+            background: rgba(34,211,238,0.08);
+          }
+
+          .history-content {
+            cursor: pointer;
+          }
+
+          .history-content h3 {
+            margin: 0 0 7px;
+            font-size: 15px;
+            line-height: 1.6;
+          }
+
+          .history-content p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.7;
+          }
+
+          .history-content small {
+            display: block;
+            margin-top: 7px;
+            color: rgba(226,232,240,0.55);
+          }
+
+          .history-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 7px;
+            margin-top: 10px;
+          }
+
+          .small-btn {
+            padding: 7px 9px;
+            border-radius: 10px;
+            font-size: 12px;
+          }
+
+          .empty {
+            border: 1px dashed rgba(255,255,255,0.22);
+            border-radius: 18px;
+            padding: 22px;
+            color: var(--muted);
+            text-align: center;
+            line-height: 1.9;
+          }
+
+          @keyframes floorMove {
+            from { transform: rotateX(60deg) translateY(210px) scale(1.25); opacity: 0.45; }
+            to { transform: rotateX(64deg) translateY(120px) scale(1.5); opacity: 0.72; }
+          }
+
+          @keyframes float3d {
+            from { transform: translate3d(0, 0, 0) rotateX(0deg) rotateY(0deg); }
+            to { transform: translate3d(-18px, -28px, 80px) rotateX(20deg) rotateY(28deg); }
+          }
+
+          @keyframes codeMove {
+            from { transform: translateY(0) rotate(-9deg); opacity: 0.16; }
+            to { transform: translateY(-30px) rotate(-6deg); opacity: 0.32; }
+          }
+
+          @media (max-width: 980px) {
+            .page {
+              padding: 18px 12px 76px;
+            }
+
+            .hero,
+            .workspace {
+              grid-template-columns: 1fr;
+            }
+
+            .hero-main {
+              padding: 22px;
+            }
+
+            .panel {
+              min-height: auto;
+            }
+
+            textarea,
+            .preview {
+              min-height: 430px;
+            }
+
+            .panel-head {
+              flex-direction: column;
+            }
+
+            .actions {
+              justify-content: flex-start;
+            }
+
+            .drawer-tools {
+              grid-template-columns: 1fr;
+            }
+
+            .neural {
+              width: 300px;
+              opacity: 0.34;
+            }
+          }
+
+          @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+              animation-duration: 0.001ms !important;
+              animation-iteration-count: 1 !important;
+              scroll-behavior: auto !important;
+            }
+          }
+          EOF_CSS
+
+          cat > README.md <<'EOF_README'
+          # RTL Markdown Fixer
+
+          ابزار وب برای نمایش تمیز متن فارسی راست‌به‌چپ همراه با Markdown، کد، لینک، ایمیل و فرمول LaTeX.
+
+          ## Features
+
+          - Persian RTL Markdown preview
+          - Safe LTR rendering for code, links, emails, file paths and formulas
+          - LaTeX support with KaTeX
+          - Local history drawer with search, rename, pin and delete
+          - Animated tech / AI style 3D background
+          - Dark modern UI
+
+          ## Deploy
+
+          This project is ready for Vercel.
+
+          - Framework: Next.js
+          - Build command: `npm run build`
+          - Environment variables: none
+          EOF_README
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/layout.tsx app/page.tsx app/globals.css README.md
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Upgrade UI and add history drawer"
+            git push
+          fi
