@@ -1,0 +1,235 @@
+:root {
+  color-scheme: dark;
+  --bg: #070a12;
+  --panel: rgba(255, 255, 255, 0.07);
+  --panel-strong: rgba(255, 255, 255, 0.11);
+  --text: #eef3ff;
+  --muted: #a8b0c5;
+  --border: rgba(255, 255, 255, 0.14);
+  --accent: #8b5cf6;
+  --accent-2: #22d3ee;
+  --danger: #fb7185;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background:
+    radial-gradient(circle at 20% 10%, rgba(139, 92, 246, 0.28), transparent 34rem),
+    radial-gradient(circle at 85% 20%, rgba(34, 211, 238, 0.18), transparent 30rem),
+    var(--bg);
+  color: var(--text);
+  font-family: Tahoma, Arial, sans-serif;
+}
+
+button,
+textarea {
+  font: inherit;
+}
+
+.page {
+  min-height: 100vh;
+  padding: 32px 18px;
+}
+
+.shell {
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+.hero {
+  margin-bottom: 22px;
+  padding: 26px;
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04));
+  box-shadow: 0 22px 80px rgba(0,0,0,0.35);
+}
+
+.badge {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: #dbeafe;
+  background: rgba(139,92,246,0.15);
+  font-size: 13px;
+}
+
+h1 {
+  margin: 16px 0 10px;
+  font-size: clamp(30px, 5vw, 58px);
+  line-height: 1.12;
+}
+
+.lead {
+  max-width: 850px;
+  margin: 0;
+  color: var(--muted);
+  line-height: 2;
+  font-size: 17px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.panel {
+  min-height: 680px;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  overflow: hidden;
+  background: var(--panel);
+  box-shadow: 0 18px 60px rgba(0,0,0,0.28);
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,0.06);
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 15px;
+  color: #f8fafc;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.btn {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel-strong);
+  color: var(--text);
+  padding: 9px 12px;
+  cursor: pointer;
+  transition: 0.18s ease;
+}
+
+.btn:hover {
+  border-color: rgba(139, 92, 246, 0.75);
+  transform: translateY(-1px);
+}
+
+.btn.primary {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: white;
+  border: 0;
+}
+
+.btn.danger {
+  color: #fecdd3;
+  border-color: rgba(251, 113, 133, 0.3);
+}
+
+textarea {
+  width: 100%;
+  height: calc(100% - 58px);
+  min-height: 620px;
+  resize: vertical;
+  border: 0;
+  outline: 0;
+  padding: 22px;
+  background: rgba(0,0,0,0.16);
+  color: var(--text);
+  line-height: 2;
+  font-size: 16px;
+  direction: rtl;
+  unicode-bidi: plaintext;
+}
+
+.preview {
+  min-height: 620px;
+  padding: 22px;
+  line-height: 2;
+  overflow-wrap: anywhere;
+}
+
+.preview :where(p, li, blockquote, h1, h2, h3, h4, h5, h6) {
+  text-align: start;
+  unicode-bidi: plaintext;
+}
+
+.preview :where(pre, code, kbd, samp, .katex, .katex-display) {
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+  text-align: left;
+  font-family: Consolas, Monaco, "Courier New", monospace;
+}
+
+.preview pre {
+  overflow: auto;
+  padding: 16px;
+  border-radius: 16px;
+  background: rgba(0,0,0,0.45);
+  border: 1px solid var(--border);
+  line-height: 1.75;
+}
+
+.preview code {
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.10);
+}
+
+.preview pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.preview a {
+  direction: ltr;
+  unicode-bidi: isolate;
+  color: #67e8f9;
+}
+
+.preview table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: auto;
+}
+
+.preview th,
+.preview td {
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+}
+
+.toast {
+  margin-top: 14px;
+  color: #bbf7d0;
+  min-height: 24px;
+}
+
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .panel {
+    min-height: auto;
+  }
+
+  textarea,
+  .preview {
+    min-height: 430px;
+  }
+}
