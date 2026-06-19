@@ -419,35 +419,98 @@ export default function Home() {
   return (
     <main className="page">
       <div className="background" aria-hidden="true">
+        {/* Layer 1 — base gradient + aurora glow */}
+        <div className="bg-base" />
         <div className="aurora aurora-one" />
         <div className="aurora aurora-two" />
         <div className="aurora aurora-three" />
+
+        {/* Layer 2 — 3D perspective grid floor */}
         <div className="grid-floor" />
 
-        <div className="ring ring-one" />
-        <div className="ring ring-two" />
+        {/* Layer 3 — AI neural network graph (3D) */}
+        <svg className="neural-graph" viewBox="0 0 600 360" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <linearGradient id="edgeGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="rgba(124,58,237,0)" />
+              <stop offset="50%" stopColor="rgba(124,58,237,0.55)" />
+              <stop offset="100%" stopColor="rgba(34,211,238,0)" />
+            </linearGradient>
+            <radialGradient id="nodeGlowA" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#c4b5fd" />
+              <stop offset="100%" stopColor="rgba(124,58,237,0)" />
+            </radialGradient>
+            <radialGradient id="nodeGlowC" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#67e8f9" />
+              <stop offset="100%" stopColor="rgba(34,211,238,0)" />
+            </radialGradient>
+            <radialGradient id="nodeGlowM" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#86efac" />
+              <stop offset="100%" stopColor="rgba(20,241,149,0)" />
+            </radialGradient>
+          </defs>
+          {/* edges */}
+          <g stroke="url(#edgeGrad)" strokeWidth="1" fill="none" opacity="0.7">
+            <line x1="60" y1="80" x2="220" y2="60" />
+            <line x1="60" y1="80" x2="230" y2="180" />
+            <line x1="70" y1="280" x2="230" y2="180" />
+            <line x1="70" y1="280" x2="220" y2="300" />
+            <line x1="220" y1="60" x2="380" y2="120" />
+            <line x1="230" y1="180" x2="380" y2="120" />
+            <line x1="230" y1="180" x2="390" y2="250" />
+            <line x1="220" y1="300" x2="390" y2="250" />
+            <line x1="380" y1="120" x2="540" y2="90" />
+            <line x1="390" y1="250" x2="540" y2="90" />
+            <line x1="390" y1="250" x2="540" y2="270" />
+          </g>
+          {/* traveling light pulses along edges */}
+          <circle className="pulse pulse-1" r="2.4" fill="#a5f3fc">
+            <animateMotion dur="9s" repeatCount="indefinite" path="M60,80 L220,60 L380,120 L540,90" />
+          </circle>
+          <circle className="pulse pulse-2" r="2.2" fill="#c4b5fd">
+            <animateMotion dur="11s" repeatCount="indefinite" path="M70,280 L230,180 L390,250 L540,270" />
+          </circle>
+          <circle className="pulse pulse-3" r="2" fill="#86efac">
+            <animateMotion dur="13s" repeatCount="indefinite" path="M60,80 L230,180 L380,120" />
+          </circle>
+          {/* nodes */}
+          <circle cx="60" cy="80" r="4" fill="#a78bfa" className="node-pt" />
+          <circle cx="70" cy="280" r="4" fill="#67e8f9" className="node-pt" />
+          <circle cx="220" cy="60" r="4" fill="#a78bfa" className="node-pt" />
+          <circle cx="230" cy="180" r="5.5" fill="#a5f3fc" className="node-pt core" />
+          <circle cx="220" cy="300" r="4" fill="#86efac" className="node-pt" />
+          <circle cx="380" cy="120" r="4" fill="#a78bfa" className="node-pt" />
+          <circle cx="390" cy="250" r="4" fill="#67e8f9" className="node-pt" />
+          <circle cx="540" cy="90" r="4" fill="#86efac" className="node-pt" />
+          <circle cx="540" cy="270" r="4" fill="#a78bfa" className="node-pt" />
+        </svg>
 
-        <div className="floating-chip chip-one">{"{ code }"}</div>
-        <div className="floating-chip chip-two">∑x²</div>
-        <div className="floating-chip chip-three">π</div>
-        <div className="floating-chip chip-four">AI</div>
-        <div className="floating-chip chip-five">RTL</div>
+        {/* Layer 4 — light trails (calm diagonal beams) */}
+        <div className="trail trail-a" />
+        <div className="trail trail-b" />
+        <div className="trail trail-c" />
 
-        <div className="neural-map">
-          <span className="node node-a" />
-          <span className="node node-b" />
-          <span className="node node-c" />
-          <span className="node node-d" />
-          <span className="node node-e" />
-          <span className="edge edge-1" />
-          <span className="edge edge-2" />
-          <span className="edge edge-3" />
-          <span className="edge edge-4" />
+        {/* Layer 5 — directional RTL/LTR concept */}
+        <div className="dir-flow">
+          <span className="dir-arrow dir-rtl">⟵</span>
+          <span className="dir-label dir-rtl-lab">RTL</span>
+          <span className="dir-sep">/</span>
+          <span className="dir-arrow dir-ltr">⟶</span>
+          <span className="dir-label dir-ltr-lab">LTR</span>
         </div>
 
-        <div className="code-line code-line-one">const output = fixBidi(input)</div>
-        <div className="code-line code-line-two">E = mc²</div>
-        <div className="code-line code-line-three">Markdown + LaTeX + Code</div>
+        {/* Layer 6 — floating glyphs: Persian, English, LaTeX, code */}
+        <div className="glyph glyph-fa glyph-fa-1">متن فارسی</div>
+        <div className="glyph glyph-fa glyph-fa-2">راست‌چین</div>
+        <div className="glyph glyph-en glyph-en-1">const x = fix()</div>
+        <div className="glyph glyph-en glyph-en-2">useState()</div>
+        <div className="glyph glyph-math glyph-math-1">E = mc²</div>
+        <div className="glyph glyph-math glyph-math-2">∫₀¹ x² dx</div>
+        <div className="glyph glyph-math glyph-math-3">∑ xᵢ²</div>
+        <div className="glyph glyph-latex glyph-latex-1">{"$\\frac{a}{b}$"}</div>
+        <div className="glyph glyph-tag glyph-tag-1">{"<p>"}</div>
+        <div className="glyph glyph-tag glyph-tag-2">{"{ rtl }"}</div>
+        <div className="glyph glyph-url">https://example.com</div>
       </div>
 
       <section className="app-shell">
@@ -595,38 +658,42 @@ export default function Home() {
           <div ref={chatEndRef} />
         </section>
 
-        {/* ---------- COMPOSER ---------- */}
-        <section className="composer-card">
-          <div className="composer-head">
-            <div>
-              <h2>پیامت را بفرست</h2>
-              <p>متن فارسی، Markdown، کد، لینک، ایمیل یا فرمول LaTeX را وارد کن.</p>
-            </div>
-            <button className="btn ghost" onClick={openSample}>
-              <IconSparkles className="ico" />
-              نمونه
-            </button>
-          </div>
+        {/* ---------- COMPOSER (compact chat input) ---------- */}
+        <section className="composer" aria-label="جعبه پیام">
+          <button
+            className="composer-tool"
+            onClick={openSample}
+            title="درج متن نمونه"
+            aria-label="درج متن نمونه"
+          >
+            <IconSparkles className="ico" />
+          </button>
 
-          <div className="composer">
-            <textarea
-              ref={textareaRef}
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
-                  event.preventDefault();
-                  submitMessage();
-                }
-              }}
-              spellCheck={false}
-              placeholder="اینجا بنویس... برای ارسال سریع Ctrl + Enter بزن"
-            />
-            <button className="send-btn" onClick={() => submitMessage()}>
-              <IconSend className="send-ico" />
-              ارسال
-            </button>
-          </div>
+          <textarea
+            ref={textareaRef}
+            className="composer-input"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+                event.preventDefault();
+                submitMessage();
+              }
+            }}
+            rows={1}
+            spellCheck={false}
+            placeholder="متن فارسی، کد، لینک یا فرمول LaTeX... (Ctrl + Enter برای ارسال)"
+          />
+
+          <button
+            className="send-btn"
+            onClick={() => submitMessage()}
+            disabled={!draft.trim()}
+            aria-label="ارسال"
+            title="ارسال (Ctrl + Enter)"
+          >
+            <IconSend className="send-ico" />
+          </button>
         </section>
       </section>
 

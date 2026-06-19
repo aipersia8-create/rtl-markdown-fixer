@@ -117,158 +117,253 @@ a {
   flex-direction: column;
 }
 
-/* =====================  3D BACKGROUND  ===================== */
+/* =====================  3D AI BACKGROUND  ===================== */
+/* The scene communicates: AI + Text + RTL/LTR + Persian + Markdown + LaTeX + Code.
+   Layered, calm, premium. Movement is intentionally slow (5–10px / 15–25s). */
 .background {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
   perspective: 1200px;
+  overflow: hidden;
+}
+
+/* Layer 1 — deep base gradient */
+.bg-base {
+  position: absolute;
+  inset: 0;
   background:
-    radial-gradient(circle at 15% 12%, rgba(124, 58, 237, 0.4), transparent 32rem),
-    radial-gradient(circle at 88% 16%, rgba(34, 211, 238, 0.28), transparent 36rem),
-    radial-gradient(circle at 50% 96%, rgba(20, 241, 149, 0.14), transparent 34rem),
+    radial-gradient(circle at 15% 12%, rgba(124, 58, 237, 0.34), transparent 34rem),
+    radial-gradient(circle at 88% 16%, rgba(34, 211, 238, 0.24), transparent 36rem),
+    radial-gradient(circle at 50% 96%, rgba(20, 241, 149, 0.12), transparent 34rem),
     linear-gradient(160deg, #02030a 0%, #080d22 48%, #050613 100%);
 }
 
-/* Subtle film grain / vignette to lift readability */
+/* Vignette to lift foreground readability */
 .background::after {
   content: "";
   position: absolute;
   inset: 0;
   background:
     linear-gradient(rgba(255, 255, 255, 0.04), transparent 30%),
-    radial-gradient(circle at center, transparent 0%, rgba(0, 0, 0, 0.42) 85%);
+    radial-gradient(circle at center, transparent 0%, rgba(0, 0, 0, 0.46) 86%);
 }
 
-/* Aurora blobs */
+/* Aurora glow blobs — very slow drift */
 .aurora {
   position: absolute;
-  width: 46vw;
-  height: 46vw;
+  width: 48vw;
+  height: 48vw;
   min-width: 360px;
   min-height: 360px;
   border-radius: 999px;
-  filter: blur(60px);
-  opacity: 0.34;
+  filter: blur(70px);
+  opacity: 0.3;
   mix-blend-mode: screen;
-  animation: auroraMove 16s ease-in-out infinite alternate;
   will-change: transform;
 }
-.aurora-one { top: -14%; right: 6%; background: rgba(124, 58, 237, 0.5); }
-.aurora-two { bottom: -22%; left: 4%; background: rgba(34, 211, 238, 0.44); animation-delay: -5s; }
-.aurora-three { top: 38%; left: 32%; background: rgba(20, 241, 149, 0.22); animation-delay: -9s; }
+.aurora-one {
+  top: -16%;
+  right: 4%;
+  background: rgba(124, 58, 237, 0.5);
+  animation: driftA 22s ease-in-out infinite alternate;
+}
+.aurora-two {
+  bottom: -24%;
+  left: 2%;
+  background: rgba(34, 211, 238, 0.42);
+  animation: driftB 26s ease-in-out infinite alternate;
+}
+.aurora-three {
+  top: 34%;
+  left: 30%;
+  background: rgba(20, 241, 149, 0.2);
+  animation: driftA 30s ease-in-out infinite alternate-reverse;
+}
 
-/* Perspective grid floor */
+/* Layer 2 — perspective digital grid floor */
 .grid-floor {
   position: absolute;
   inset: -22%;
   background-image:
-    linear-gradient(rgba(124, 58, 237, 0.12) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(34, 211, 238, 0.12) 1px, transparent 1px);
-  background-size: 78px 78px;
-  transform: rotateX(64deg) translateY(240px) scale(1.4);
-  mask-image: radial-gradient(circle at center, black, transparent 78%);
-  animation: floorMove 13s ease-in-out infinite alternate;
+    linear-gradient(rgba(124, 58, 237, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34, 211, 238, 0.1) 1px, transparent 1px);
+  background-size: 80px 80px;
+  transform: rotateX(64deg) translateY(250px) scale(1.45);
+  mask-image: radial-gradient(circle at center, black, transparent 76%);
+  animation: floorMove 24s ease-in-out infinite alternate;
+  opacity: 0.55;
 }
 
-/* Orbiting rings */
-.ring {
+/* Layer 3 — AI neural network graph (SVG), 3D tilted, slow breathe */
+.neural-graph {
   position: absolute;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
-  box-shadow: 0 0 70px rgba(34, 211, 238, 0.14), inset 0 0 30px rgba(124, 58, 237, 0.1);
-  transform-style: preserve-3d;
-  animation: ringSpin 18s linear infinite;
-}
-.ring::after {
-  content: "";
-  position: absolute;
-  top: -4px;
+  top: 50%;
   left: 50%;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent-2);
-  box-shadow: 0 0 16px var(--accent-2);
-}
-.ring-one { top: 14%; left: 10%; width: 220px; height: 220px; transform: rotateX(62deg) rotateZ(20deg); }
-.ring-two { right: 8%; bottom: 12%; width: 270px; height: 270px; transform: rotateX(68deg) rotateZ(-18deg); animation-delay: -7s; }
-.ring-two::after { background: var(--accent); box-shadow: 0 0 16px var(--accent); }
-
-/* Floating glass chips */
-.floating-chip {
-  position: absolute;
-  display: grid;
-  place-items: center;
-  min-width: 78px;
-  height: 78px;
-  padding: 0 14px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 0 50px rgba(34, 211, 238, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.14);
-  color: rgba(255, 255, 255, 0.62);
-  font-weight: 800;
-  direction: ltr;
+  width: min(820px, 92vw);
+  height: auto;
+  transform: translate(-50%, -50%) rotateX(46deg) rotateZ(-12deg);
   transform-style: preserve-3d;
-  animation: float3d 10s ease-in-out infinite alternate;
+  opacity: 0.55;
+  animation: neuralBreathe 18s ease-in-out infinite alternate;
+  filter: drop-shadow(0 30px 60px rgba(124, 58, 237, 0.18));
 }
-.chip-one { top: 22%; right: 5%; }
-.chip-two { top: 64%; right: 18%; animation-delay: -2s; }
-.chip-three { top: 27%; left: 16%; animation-delay: -4s; }
-.chip-four { bottom: 16%; left: 26%; animation-delay: -6s; }
-.chip-five { top: 54%; left: 6%; animation-delay: -8s; }
+.neural-graph .node-pt {
+  filter: drop-shadow(0 0 6px currentColor);
+  animation: nodePulse 5s ease-in-out infinite alternate;
+}
+.neural-graph .core {
+  animation: nodePulse 3.4s ease-in-out infinite alternate;
+}
+.neural-graph .pulse {
+  filter: drop-shadow(0 0 8px currentColor);
+}
+@keyframes nodePulse {
+  from { opacity: 0.55; }
+  to { opacity: 1; }
+}
+@keyframes neuralBreathe {
+  from { transform: translate(-50%, -50%) rotateX(46deg) rotateZ(-12deg) scale(1); opacity: 0.48; }
+  to { transform: translate(-50%, -50%) rotateX(46deg) rotateZ(-8deg) scale(1.05); opacity: 0.64; }
+}
 
-/* Neural map */
-.neural-map {
-  position: absolute;
-  top: 46%;
-  left: 50%;
-  width: 430px;
-  height: 260px;
-  transform: translate(-50%, -50%) rotateX(58deg) rotateZ(-14deg);
-  opacity: 0.6;
-  animation: neuralPulse 8s ease-in-out infinite alternate;
-}
-.node {
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #67e8f9;
-  box-shadow: 0 0 22px #22d3ee;
-}
-.node-a { top: 24px; left: 28px; }
-.node-b { top: 92px; left: 168px; background: #a78bfa; box-shadow: 0 0 22px #8b5cf6; }
-.node-c { bottom: 40px; left: 94px; }
-.node-d { top: 58px; right: 78px; background: #86efac; box-shadow: 0 0 22px #14f195; }
-.node-e { bottom: 38px; right: 50px; background: #a78bfa; box-shadow: 0 0 22px #8b5cf6; }
-.edge {
+/* Layer 4 — light trails (thin calm diagonal beams) */
+.trail {
   position: absolute;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(103, 232, 249, 0.7), transparent);
-  transform-origin: left;
+  width: 70vw;
+  transform-origin: left center;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(124, 58, 237, 0.5) 40%,
+    rgba(34, 211, 238, 0.55) 60%,
+    transparent
+  );
+  filter: blur(0.4px);
+  opacity: 0.5;
 }
-.edge-1 { width: 160px; top: 62px; left: 42px; transform: rotate(26deg); }
-.edge-2 { width: 180px; top: 110px; left: 182px; transform: rotate(-17deg); }
-.edge-3 { width: 150px; top: 180px; left: 108px; transform: rotate(-46deg); }
-.edge-4 { width: 150px; top: 112px; right: 52px; transform: rotate(54deg); }
+.trail-a {
+  top: 22%;
+  left: -10%;
+  transform: rotate(18deg);
+  animation: trailSweep 16s ease-in-out infinite alternate;
+}
+.trail-b {
+  top: 58%;
+  left: -10%;
+  transform: rotate(-12deg);
+  opacity: 0.35;
+  animation: trailSweep 22s ease-in-out infinite alternate;
+  animation-delay: -6s;
+}
+.trail-c {
+  top: 78%;
+  left: -10%;
+  transform: rotate(8deg);
+  opacity: 0.3;
+  animation: trailSweep 19s ease-in-out infinite alternate;
+  animation-delay: -11s;
+}
+@keyframes trailSweep {
+  from { transform: translateX(-30px) rotate(var(--rot, 0deg)); opacity: 0.2; }
+  to { transform: translateX(40px) rotate(var(--rot, 0deg)); opacity: 0.55; }
+}
 
-/* Drifting code whispers */
-.code-line {
+/* Layer 5 — directional RTL/LTR flow badge */
+.dir-flow {
   position: absolute;
+  top: 16%;
+  left: 6%;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(10px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  font-size: 13px;
+  font-weight: 700;
   direction: ltr;
-  font-family: "Cascadia Code", Consolas, Monaco, "Courier New", monospace;
-  color: rgba(226, 232, 240, 0.24);
-  font-size: 14px;
-  transform: rotate(-9deg);
-  animation: codeDrift 12s ease-in-out infinite alternate;
+  color: rgba(255, 255, 255, 0.6);
+  animation: glyphFloat 20s ease-in-out infinite alternate;
 }
-.code-line-one { top: 17%; left: 5%; }
-.code-line-two { bottom: 25%; right: 6%; animation-delay: -3s; }
-.code-line-three { top: 78%; left: 44%; animation-delay: -6s; }
+.dir-flow .dir-arrow { font-size: 17px; line-height: 1; }
+.dir-flow .dir-rtl { color: #c4b5fd; }
+.dir-flow .dir-ltr { color: #67e8f9; }
+.dir-flow .dir-sep { opacity: 0.4; }
+
+/* Layer 6 — floating glyphs: Persian, English, LaTeX, code, math */
+.glyph {
+  position: absolute;
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0.5;
+  will-change: transform;
+}
+/* Persian text — RTL */
+.glyph-fa {
+  font-family: Vazirmatn, "Segoe UI", Tahoma, Arial, sans-serif;
+  color: rgba(196, 181, 253, 0.78);
+  direction: rtl;
+}
+/* English / code — LTR mono */
+.glyph-en,
+.glyph-tag,
+.glyph-url {
+  font-family: "Cascadia Code", Consolas, Monaco, "Courier New", monospace;
+  color: rgba(165, 243, 252, 0.7);
+  direction: ltr;
+}
+/* Math / LaTeX */
+.glyph-math,
+.glyph-latex {
+  font-family: "Cambria Math", "Cascadia Code", Consolas, serif;
+  font-style: italic;
+  color: rgba(134, 239, 172, 0.74);
+  direction: ltr;
+}
+.glyph-url { color: rgba(165, 243, 252, 0.62); font-size: 11.5px; }
+
+.glyph-fa-1 { top: 30%; right: 7%; animation: glyphFloat 17s ease-in-out infinite alternate; }
+.glyph-fa-2 { top: 66%; right: 14%; animation: glyphFloat 23s ease-in-out infinite alternate; animation-delay: -5s; }
+.glyph-en-1 { top: 20%; right: 30%; animation: glyphFloat 19s ease-in-out infinite alternate; animation-delay: -3s; }
+.glyph-en-2 { bottom: 22%; left: 12%; animation: glyphFloat 21s ease-in-out infinite alternate; animation-delay: -8s; }
+.glyph-math-1 { top: 12%; left: 26%; animation: glyphFloat 18s ease-in-out infinite alternate; animation-delay: -2s; }
+.glyph-math-2 { bottom: 30%; right: 9%; animation: glyphFloat 24s ease-in-out infinite alternate; animation-delay: -6s; }
+.glyph-math-3 { top: 48%; left: 5%; animation: glyphFloat 20s ease-in-out infinite alternate; animation-delay: -10s; }
+.glyph-latex-1 { top: 38%; right: 24%; animation: glyphFloat 22s ease-in-out infinite alternate; animation-delay: -4s; }
+.glyph-tag-1 { bottom: 16%; right: 30%; animation: glyphFloat 16s ease-in-out infinite alternate; animation-delay: -7s; }
+.glyph-tag-2 { top: 72%; left: 24%; animation: glyphFloat 25s ease-in-out infinite alternate; animation-delay: -9s; }
+.glyph-url { bottom: 12%; left: 14%; animation: glyphFloat 21s ease-in-out infinite alternate; animation-delay: -12s; }
+
+/* Calm, premium glyph float: ~6–8px drift over 16–25s */
+@keyframes glyphFloat {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-7px, -8px, 6px); }
+}
+@keyframes driftA {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(-30px, 22px, 0) scale(1.08); }
+}
+@keyframes driftB {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(28px, -24px, 0) scale(1.1); }
+}
+@keyframes floorMove {
+  from { transform: rotateX(62deg) translateY(250px) scale(1.4); opacity: 0.4; }
+  to { transform: rotateX(66deg) translateY(140px) scale(1.55); opacity: 0.66; }
+}
 
 /* =====================  APP SHELL  ===================== */
 .app-shell {
@@ -287,7 +382,7 @@ a {
 .topbar,
 .status-strip,
 .chat-window,
-.composer-card,
+.composer,
 .drawer {
   position: relative;
   border: 1px solid var(--line);
@@ -299,7 +394,7 @@ a {
 .topbar::before,
 .status-strip::before,
 .chat-window::before,
-.composer-card::before,
+.composer::before,
 .drawer::before {
   content: "";
   position: absolute;
@@ -809,107 +904,103 @@ h1 {
   height: 15px;
 }
 
-/* =====================  COMPOSER  ===================== */
-.composer-card {
-  border-radius: var(--radius-xl);
-  padding: 16px;
-  background: rgba(5, 9, 20, 0.36);
-}
-.composer-head {
+/* =====================  COMPOSER (compact chat input)  ===================== */
+/* Slim, single-row, modern AI chat input — not a heavy card. */
+.composer {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-.composer-head h2 {
-  margin: 0;
-  font-size: 17px;
-  font-weight: 700;
-}
-.composer-head p {
-  margin: 6px 0 0;
-  color: var(--muted);
-  font-size: 13px;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 8px 8px 8px;
+  border-radius: 18px;
+  background: rgba(8, 13, 30, 0.66);
 }
 
-.composer {
+/* Sample / tool icon button — compact, left of input */
+.composer-tool {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 12px;
-  align-items: stretch;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  margin-bottom: 1px;
+  transition: transform 0.16s var(--ease-out), color 0.16s ease,
+    border-color 0.16s ease, background 0.16s ease;
 }
-.composer textarea {
-  min-height: 96px;
-  max-height: 220px;
-  resize: vertical;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 20px;
+.composer-tool:hover {
+  color: #c4b5fd;
+  border-color: rgba(124, 58, 237, 0.5);
+  background: rgba(124, 58, 237, 0.12);
+  transform: translateY(-1px);
+}
+.composer-tool:active {
+  transform: translateY(0);
+}
+.composer-tool .ico {
+  width: 17px;
+  height: 17px;
+}
+
+/* The textarea itself — auto-grow feel, low height, generous radius */
+.composer-input {
+  flex: 1 1 auto;
+  min-height: 38px;
+  max-height: 200px;
+  resize: none;
+  border: 0;
   outline: 0;
-  padding: 16px 18px;
-  background: rgba(2, 4, 14, 0.5);
+  background: transparent;
   color: var(--text);
-  line-height: 1.95;
+  line-height: 1.7;
+  font-size: 15px;
+  padding: 10px 4px;
   direction: rtl;
   unicode-bidi: plaintext;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  overflow-y: auto;
 }
-.composer textarea::placeholder {
+.composer-input::placeholder {
   color: var(--muted-2);
 }
-.composer textarea:focus {
-  border-color: rgba(34, 211, 238, 0.6);
-  box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.12);
-}
 
-.composer-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  justify-content: space-between;
-}
-
+/* Send button — compact circular icon button, well aligned */
 .send-btn {
-  position: relative;
-  min-width: 116px;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: grid;
+  place-items: center;
   border: 0;
-  border-radius: 18px;
-  padding: 0 22px;
-  min-height: 96px;
+  border-radius: 13px;
   background: var(--grad-primary);
   color: #fff;
-  font-weight: 800;
-  font-size: 15px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  box-shadow: 0 20px 46px rgba(124, 58, 237, 0.32),
+  box-shadow: 0 8px 22px rgba(124, 58, 237, 0.34),
     inset 0 1px 0 rgba(255, 255, 255, 0.4);
-  overflow: hidden;
-  transition: transform 0.16s var(--ease-out), filter 0.16s ease;
+  transition: transform 0.16s var(--ease-out), filter 0.16s ease,
+    box-shadow 0.16s ease, opacity 0.16s ease;
 }
-.send-btn::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.28), transparent 70%);
-  transform: translateX(-120%);
-  transition: transform 0.6s var(--ease-out);
+.send-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+  box-shadow: 0 12px 28px rgba(124, 58, 237, 0.44),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
-.send-btn:hover {
-  transform: translateY(-2px);
-  filter: brightness(1.08);
+.send-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.96);
 }
-.send-btn:hover::before {
-  transform: translateX(120%);
-}
-.send-btn:active {
-  transform: translateY(0);
+.send-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+  filter: grayscale(0.3);
 }
 .send-btn .send-ico {
   width: 18px;
   height: 18px;
+  transform: scaleX(-1); /* point in RTL send direction */
 }
 
 /* =====================  TOAST  ===================== */
@@ -1177,7 +1268,7 @@ h1 {
 .chat-empty .emoji {
   font-size: 48px;
   filter: drop-shadow(0 10px 30px rgba(124, 58, 237, 0.5));
-  animation: float3d 6s ease-in-out infinite alternate;
+  animation: emojiBob 6s ease-in-out infinite alternate;
 }
 .chat-empty h3 {
   margin: 0;
@@ -1191,31 +1282,7 @@ h1 {
   line-height: 1.9;
 }
 
-/* =====================  KEYFRAMES  ===================== */
-@keyframes auroraMove {
-  from { transform: translate3d(0, 0, 0) scale(1); }
-  to { transform: translate3d(34px, -30px, 0) scale(1.12); }
-}
-@keyframes floorMove {
-  from { transform: rotateX(62deg) translateY(240px) scale(1.35); opacity: 0.4; }
-  to { transform: rotateX(66deg) translateY(120px) scale(1.5); opacity: 0.72; }
-}
-@keyframes ringSpin {
-  from { rotate: 0deg; }
-  to { rotate: 360deg; }
-}
-@keyframes float3d {
-  from { transform: translate3d(0, 0, 0) rotateX(0deg) rotateY(0deg); }
-  to { transform: translate3d(-16px, -28px, 70px) rotateX(18deg) rotateY(26deg); }
-}
-@keyframes neuralPulse {
-  from { opacity: 0.42; filter: blur(0); }
-  to { opacity: 0.74; filter: blur(0.15px); }
-}
-@keyframes codeDrift {
-  from { transform: translateY(0) rotate(-9deg); opacity: 0.14; }
-  to { transform: translateY(-32px) rotate(-6deg); opacity: 0.32; }
-}
+/* =====================  KEYFRAMES (shared)  ===================== */
 @keyframes msgIn {
   from { opacity: 0; transform: translateY(14px); }
   to { opacity: 1; transform: translateY(0); }
@@ -1227,6 +1294,10 @@ h1 {
 @keyframes pulseDot {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.5; transform: scale(0.8); }
+}
+@keyframes emojiBob {
+  from { transform: translateY(0); }
+  to { transform: translateY(-8px); }
 }
 
 /* =====================  RESPONSIVE  ===================== */
@@ -1268,27 +1339,38 @@ h1 {
     border-radius: 14px;
   }
   .composer {
-    grid-template-columns: 1fr;
+    gap: 6px;
+    padding: 7px;
   }
+  .composer-tool,
   .send-btn {
-    min-height: 52px;
+    width: 36px;
+    height: 36px;
   }
-  .composer-head {
-    flex-direction: column;
+  .composer-input {
+    font-size: 14.5px;
+    padding: 9px 2px;
   }
   .drawer-tools {
     grid-template-columns: 1fr;
   }
-  .floating-chip,
-  .ring {
+  .glyph {
+    font-size: 11.5px;
+    padding: 5px 9px;
     opacity: 0.4;
   }
-  .neural-map {
-    width: 300px;
-    opacity: 0.4;
-  }
-  .code-line {
+  .glyph-url {
     display: none;
+  }
+  .neural-graph {
+    opacity: 0.4;
+  }
+  .dir-flow {
+    font-size: 11px;
+    padding: 6px 10px;
+  }
+  .trail {
+    opacity: 0.28;
   }
   h1 {
     font-size: 26px;
