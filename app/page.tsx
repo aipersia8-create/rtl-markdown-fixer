@@ -105,14 +105,25 @@ function formatDate(value: number) {
 // A feed-forward-style graph: columns of neurons connected by glowing synapses,
 // with light "signal" pulses travelling along the edges. Deterministic so SSR
 // matches client render. Each `variant` shifts the layout for layered depth.
+//
+// IMPORTANT (hydration): all geometry is pre-rounded to a fixed decimal precision
+// as STRINGS at build time. Floating-point results from Math.sin can differ in the
+// last digit between Node (V8 server) and the browser, which causes a hydration
+// mismatch. Rounding once, up-front, guarantees identical server/client output.
 
-type Neuron = { x: number; y: number; r: number; tone: 0 | 1 | 2 };
+// Round to 1 decimal place and stringify — deterministic across runtimes.
+function f1(v: number) {
+  return Math.round(v * 10) / 10 + "";
+}
 
 // Tone -> stroke/fill colour tokens.
 const TONE_COLOR = ["#a78bfa", "#67e8f9", "#86efac"];
 const TONE_SOFT = ["rgba(167,139,250,0.5)", "rgba(103,232,249,0.5)", "rgba(134,239,172,0.5)"];
 
-function buildNet(variant: number) {
+type BuiltNeuron = { x: string; y: string; r: number; tone: 0 | 1 | 2 };
+type BuiltNet = { neurons: BuiltNeuron[]; layers: BuiltNeuron[][] };
+
+function buildNet(variant: number): BuiltNet {
   // Column x positions with subtle per-variant horizontal drift.
   const drift = variant * 70 - 70;
   const cols = [120, 250, 380, 510, 640, 750].map((x) => x + drift);
@@ -120,36 +131,47 @@ function buildNet(variant: number) {
   const counts = [4, 6, 8, 8, 6, 4];
   const seedStep = variant * 1000;
 
-  const neurons: Neuron[] = [];
-  const layers: Neuron[][] = [];
+  const neurons: BuiltNeuron[] = [];
+  const layers: BuiltNeuron[][] = [];
 
   cols.forEach((cx, ci) => {
     const n = counts[ci];
-    const layer: Neuron[] = [];
+    const layer: BuiltNeuron[] = [];
     const span = 460;
     const start = (500 - span) / 2;
     for (let i = 0; i < n; i++) {
       // Pseudo-random but deterministic jitter on Y position + radius.
       const rnd = Math.abs(Math.sin((ci + 1) * 99.13 + (i + 1) * 53.17 + seedStep));
       const gap = span / (n + 1);
-      const y = start + gap * (i + 1) + (rnd - 0.5) * 26;
+      const yRaw = start + gap * (i + 1) + (rnd - 0.5) * 26;
       const tone = ((ci + i + variant) % 3) as 0 | 1 | 2;
-      const r = 3 + rnd * 2.4;
-      const node = { x: cx, y, r, tone };
+      const node: BuiltNeuron = {
+        x: f1(cx),
+        y: f1(yRaw),
+        r: Math.round((3 + rnd * 2.4) * 10) / 10,
+        tone
+      };
       neurons.push(node);
       layer.push(node);
     }
     layers.push(layer);
   });
 
-  // Connect every neuron to a few neurons in the next column.
-  const edges: { a: Neuron; b: Neuron; tone: number }[] = [];
-  for (let li = 0; li < layers.length - 1; li++) {
-    const cur = layers[li];
-    const next = layers[li + 1];
+  return { neurons, layers };
+}
+
+// Pre-computed nets per variant (module-level so they are stable).
+const NETS: BuiltNet[] = [buildNet(0), buildNet(1), buildNet(2)];
+
+// Connect every neuron to a few neurons in the next column (deterministic).
+function buildEdges(net: BuiltNet) {
+  const edges: { a: BuiltNeuron; b: BuiltNeuron; tone: number }[] = [];
+  for (let li = 0; li < net.layers.length - 1; li++) {
+    const cur = net.layers[li];
+    const next = net.layers[li + 1];
     cur.forEach((a, ai) => {
       next.forEach((b, bi) => {
-        const rnd = Math.abs(Math.sin(li * 17.3 + ai * 7.7 + bi * 3.1 + seedStep));
+        const rnd = Math.abs(Math.sin(li * 17.3 + ai * 7.7 + bi * 3.1));
         // Keep ~55% of possible connections for an organic, non-grid feel.
         if (rnd > 0.45) {
           edges.push({ a, b, tone: (li + ai) % 3 });
@@ -157,12 +179,9 @@ function buildNet(variant: number) {
       });
     });
   }
-
-  return { neurons, edges, layers };
+  return edges;
 }
-
-// Pre-computed nets per variant (module-level so they are stable).
-const NETS = [buildNet(0), buildNet(1), buildNet(2)];
+const EDGES = NETS.map(buildEdges);
 
 // A handful of long paths through consecutive columns for travelling signals.
 function signalPaths(variant: number) {
@@ -175,7 +194,7 @@ function signalPaths(variant: number) {
     net.layers.forEach((layer, li) => {
       curIdx = (curIdx + li) % layer.length;
       const node = layer[curIdx];
-      pts.push(`${li === 0 ? "M" : "L"}${node.x.toFixed(1)},${node.y.toFixed(1)}`);
+      pts.push(`${li === 0 ? "M" : "L"}${node.x},${node.y}`);
     });
     paths.push({
       d: pts.join(" "),
@@ -189,7 +208,8 @@ function signalPaths(variant: number) {
 
 function SynapseLayer({ variant = 1 }: { variant?: number }) {
   const v = Math.max(0, Math.min(2, variant - 1));
-  const { edges, neurons } = NETS[v];
+  const edges = EDGES[v];
+  const { neurons } = NETS[v];
   const paths = signalPaths(v);
   const uid = `b${v}`;
 
@@ -248,26 +268,31 @@ function SynapseLayer({ variant = 1 }: { variant?: number }) {
 
       {/* Neurons with a slow breathing pulse */}
       <g filter={`url(#glow-${uid})`}>
-        {neurons.map((n, i) => (
-          <g key={`n${i}`}>
-            <circle cx={n.x} cy={n.y} r={n.r * 2.4} fill={TONE_COLOR[n.tone]} opacity={0.16}>
-              <animate
-                attributeName="opacity"
-                values="0.08;0.26;0.08"
-                dur={`${4 + (i % 5)}s`}
-                repeatCount="indefinite"
-              />
-            </circle>
-            <circle cx={n.x} cy={n.y} r={n.r} fill={TONE_COLOR[n.tone]} className={`neu tone-${n.tone}`}>
-              <animate
-                attributeName="r"
-                values={`${n.r};${n.r + 1.1};${n.r}`}
-                dur={`${3.5 + (i % 4)}s`}
-                repeatCount="indefinite"
-              />
-            </circle>
-          </g>
-        ))}
+        {neurons.map((n, i) => {
+          const rStr = n.r + "";
+          const haloStr = Math.round(n.r * 2.4 * 10) / 10 + "";
+          const pulseStr = Math.round((n.r + 1.1) * 10) / 10 + "";
+          return (
+            <g key={`n${i}`}>
+              <circle cx={n.x} cy={n.y} r={haloStr} fill={TONE_COLOR[n.tone]} opacity={0.16}>
+                <animate
+                  attributeName="opacity"
+                  values="0.08;0.26;0.08"
+                  dur={`${4 + (i % 5)}s`}
+                  repeatCount="indefinite"
+                />
+              </circle>
+              <circle cx={n.x} cy={n.y} r={rStr} fill={TONE_COLOR[n.tone]} className={`neu tone-${n.tone}`}>
+                <animate
+                  attributeName="r"
+                  values={`${rStr};${pulseStr};${rStr}`}
+                  dur={`${3.5 + (i % 4)}s`}
+                  repeatCount="indefinite"
+                />
+              </circle>
+            </g>
+          );
+        })}
       </g>
     </>
   );
