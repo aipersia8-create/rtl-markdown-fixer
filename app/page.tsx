@@ -101,6 +101,178 @@ function formatDate(value: number) {
 }
 /* -------------------------------------------------------- */
 
+/* ---------- Deep 3D neural network background ---------- */
+// A feed-forward-style graph: columns of neurons connected by glowing synapses,
+// with light "signal" pulses travelling along the edges. Deterministic so SSR
+// matches client render. Each `variant` shifts the layout for layered depth.
+
+type Neuron = { x: number; y: number; r: number; tone: 0 | 1 | 2 };
+
+// Tone -> stroke/fill colour tokens.
+const TONE_COLOR = ["#a78bfa", "#67e8f9", "#86efac"];
+const TONE_SOFT = ["rgba(167,139,250,0.5)", "rgba(103,232,249,0.5)", "rgba(134,239,172,0.5)"];
+
+function buildNet(variant: number) {
+  // Column x positions with subtle per-variant horizontal drift.
+  const drift = variant * 70 - 70;
+  const cols = [120, 250, 380, 510, 640, 750].map((x) => x + drift);
+  // Neuron counts per column (denser in the middle).
+  const counts = [4, 6, 8, 8, 6, 4];
+  const seedStep = variant * 1000;
+
+  const neurons: Neuron[] = [];
+  const layers: Neuron[][] = [];
+
+  cols.forEach((cx, ci) => {
+    const n = counts[ci];
+    const layer: Neuron[] = [];
+    const span = 460;
+    const start = (500 - span) / 2;
+    for (let i = 0; i < n; i++) {
+      // Pseudo-random but deterministic jitter on Y position + radius.
+      const rnd = Math.abs(Math.sin((ci + 1) * 99.13 + (i + 1) * 53.17 + seedStep));
+      const gap = span / (n + 1);
+      const y = start + gap * (i + 1) + (rnd - 0.5) * 26;
+      const tone = ((ci + i + variant) % 3) as 0 | 1 | 2;
+      const r = 3 + rnd * 2.4;
+      const node = { x: cx, y, r, tone };
+      neurons.push(node);
+      layer.push(node);
+    }
+    layers.push(layer);
+  });
+
+  // Connect every neuron to a few neurons in the next column.
+  const edges: { a: Neuron; b: Neuron; tone: number }[] = [];
+  for (let li = 0; li < layers.length - 1; li++) {
+    const cur = layers[li];
+    const next = layers[li + 1];
+    cur.forEach((a, ai) => {
+      next.forEach((b, bi) => {
+        const rnd = Math.abs(Math.sin(li * 17.3 + ai * 7.7 + bi * 3.1 + seedStep));
+        // Keep ~55% of possible connections for an organic, non-grid feel.
+        if (rnd > 0.45) {
+          edges.push({ a, b, tone: (li + ai) % 3 });
+        }
+      });
+    });
+  }
+
+  return { neurons, edges, layers };
+}
+
+// Pre-computed nets per variant (module-level so they are stable).
+const NETS = [buildNet(0), buildNet(1), buildNet(2)];
+
+// A handful of long paths through consecutive columns for travelling signals.
+function signalPaths(variant: number) {
+  const net = NETS[variant];
+  const paths: { d: string; tone: number; dur: number; delay: number }[] = [];
+  const starts = [0, 1, 2];
+  starts.forEach((rowSeed, idx) => {
+    const pts: string[] = [];
+    let curIdx = rowSeed % net.layers[0].length;
+    net.layers.forEach((layer, li) => {
+      curIdx = (curIdx + li) % layer.length;
+      const node = layer[curIdx];
+      pts.push(`${li === 0 ? "M" : "L"}${node.x.toFixed(1)},${node.y.toFixed(1)}`);
+    });
+    paths.push({
+      d: pts.join(" "),
+      tone: (rowSeed + variant) % 3,
+      dur: 7 + idx * 2.5 + variant,
+      delay: -(idx * 2.1 + variant)
+    });
+  });
+  return paths;
+}
+
+function SynapseLayer({ variant = 1 }: { variant?: number }) {
+  const v = Math.max(0, Math.min(2, variant - 1));
+  const { edges, neurons } = NETS[v];
+  const paths = signalPaths(v);
+  const uid = `b${v}`;
+
+  return (
+    <>
+      <defs>
+        <linearGradient id={`edge-${uid}`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor={TONE_SOFT[0]} />
+          <stop offset="50%" stopColor={TONE_SOFT[1]} />
+          <stop offset="100%" stopColor={TONE_SOFT[2]} />
+        </linearGradient>
+        <filter id={`glow-${uid}`} x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="2.4" result="b" />
+          <feMerge>
+            <feMergeNode in="b" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+
+      {/* Synapses */}
+      <g stroke={`url(#edge-${uid})`} strokeWidth={0.8} fill="none" opacity={0.6}>
+        {edges.map((e, i) => (
+          <line
+            key={`e${i}`}
+            x1={e.a.x}
+            y1={e.a.y}
+            x2={e.b.x}
+            y2={e.b.y}
+          />
+        ))}
+      </g>
+
+      {/* Travelling signal pulses along multi-column paths */}
+      <g filter={`url(#glow-${uid})`}>
+        {paths.map((p, i) => (
+          <circle key={`s${i}`} r={3} fill={TONE_COLOR[p.tone]}>
+            <animateMotion
+              dur={`${p.dur}s`}
+              begin={`${p.delay}s`}
+              repeatCount="indefinite"
+              path={p.d}
+              rotate="auto"
+            />
+            <animate
+              attributeName="opacity"
+              values="0;1;1;0"
+              keyTimes="0;0.12;0.85;1"
+              dur={`${p.dur}s`}
+              begin={`${p.delay}s`}
+              repeatCount="indefinite"
+            />
+          </circle>
+        ))}
+      </g>
+
+      {/* Neurons with a slow breathing pulse */}
+      <g filter={`url(#glow-${uid})`}>
+        {neurons.map((n, i) => (
+          <g key={`n${i}`}>
+            <circle cx={n.x} cy={n.y} r={n.r * 2.4} fill={TONE_COLOR[n.tone]} opacity={0.16}>
+              <animate
+                attributeName="opacity"
+                values="0.08;0.26;0.08"
+                dur={`${4 + (i % 5)}s`}
+                repeatCount="indefinite"
+              />
+            </circle>
+            <circle cx={n.x} cy={n.y} r={n.r} fill={TONE_COLOR[n.tone]} className={`neu tone-${n.tone}`}>
+              <animate
+                attributeName="r"
+                values={`${n.r};${n.r + 1.1};${n.r}`}
+                dur={`${3.5 + (i % 4)}s`}
+                repeatCount="indefinite"
+              />
+            </circle>
+          </g>
+        ))}
+      </g>
+    </>
+  );
+}
+
 /* ---------- Inline SVG icons (lightweight, crisp) ---------- */
 type IconProps = { className?: string; style?: React.CSSProperties };
 
@@ -419,98 +591,23 @@ export default function Home() {
   return (
     <main className="page">
       <div className="background" aria-hidden="true">
-        {/* Layer 1 — base gradient + aurora glow */}
+        {/* Base deep gradient + ambient glows + readability vignette */}
         <div className="bg-base" />
         <div className="aurora aurora-one" />
         <div className="aurora aurora-two" />
         <div className="aurora aurora-three" />
 
-        {/* Layer 2 — 3D perspective grid floor */}
-        <div className="grid-floor" />
-
-        {/* Layer 3 — AI neural network graph (3D) */}
-        <svg className="neural-graph" viewBox="0 0 600 360" preserveAspectRatio="xMidYMid meet">
-          <defs>
-            <linearGradient id="edgeGrad" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="rgba(124,58,237,0)" />
-              <stop offset="50%" stopColor="rgba(124,58,237,0.55)" />
-              <stop offset="100%" stopColor="rgba(34,211,238,0)" />
-            </linearGradient>
-            <radialGradient id="nodeGlowA" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#c4b5fd" />
-              <stop offset="100%" stopColor="rgba(124,58,237,0)" />
-            </radialGradient>
-            <radialGradient id="nodeGlowC" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#67e8f9" />
-              <stop offset="100%" stopColor="rgba(34,211,238,0)" />
-            </radialGradient>
-            <radialGradient id="nodeGlowM" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#86efac" />
-              <stop offset="100%" stopColor="rgba(20,241,149,0)" />
-            </radialGradient>
-          </defs>
-          {/* edges */}
-          <g stroke="url(#edgeGrad)" strokeWidth="1" fill="none" opacity="0.7">
-            <line x1="60" y1="80" x2="220" y2="60" />
-            <line x1="60" y1="80" x2="230" y2="180" />
-            <line x1="70" y1="280" x2="230" y2="180" />
-            <line x1="70" y1="280" x2="220" y2="300" />
-            <line x1="220" y1="60" x2="380" y2="120" />
-            <line x1="230" y1="180" x2="380" y2="120" />
-            <line x1="230" y1="180" x2="390" y2="250" />
-            <line x1="220" y1="300" x2="390" y2="250" />
-            <line x1="380" y1="120" x2="540" y2="90" />
-            <line x1="390" y1="250" x2="540" y2="90" />
-            <line x1="390" y1="250" x2="540" y2="270" />
-          </g>
-          {/* traveling light pulses along edges */}
-          <circle className="pulse pulse-1" r="2.4" fill="#a5f3fc">
-            <animateMotion dur="9s" repeatCount="indefinite" path="M60,80 L220,60 L380,120 L540,90" />
-          </circle>
-          <circle className="pulse pulse-2" r="2.2" fill="#c4b5fd">
-            <animateMotion dur="11s" repeatCount="indefinite" path="M70,280 L230,180 L390,250 L540,270" />
-          </circle>
-          <circle className="pulse pulse-3" r="2" fill="#86efac">
-            <animateMotion dur="13s" repeatCount="indefinite" path="M60,80 L230,180 L380,120" />
-          </circle>
-          {/* nodes */}
-          <circle cx="60" cy="80" r="4" fill="#a78bfa" className="node-pt" />
-          <circle cx="70" cy="280" r="4" fill="#67e8f9" className="node-pt" />
-          <circle cx="220" cy="60" r="4" fill="#a78bfa" className="node-pt" />
-          <circle cx="230" cy="180" r="5.5" fill="#a5f3fc" className="node-pt core" />
-          <circle cx="220" cy="300" r="4" fill="#86efac" className="node-pt" />
-          <circle cx="380" cy="120" r="4" fill="#a78bfa" className="node-pt" />
-          <circle cx="390" cy="250" r="4" fill="#67e8f9" className="node-pt" />
-          <circle cx="540" cy="90" r="4" fill="#86efac" className="node-pt" />
-          <circle cx="540" cy="270" r="4" fill="#a78bfa" className="node-pt" />
+        {/* Deep neural network — 3D layer stack (back → front), each tilted in perspective.
+            Layered Z creates real depth; light pulses travel along the synapses. */}
+        <svg className="net net-back" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid slice">
+          <SynapseLayer />
         </svg>
-
-        {/* Layer 4 — light trails (calm diagonal beams) */}
-        <div className="trail trail-a" />
-        <div className="trail trail-b" />
-        <div className="trail trail-c" />
-
-        {/* Layer 5 — directional RTL/LTR concept */}
-        <div className="dir-flow">
-          <span className="dir-arrow dir-rtl">⟵</span>
-          <span className="dir-label dir-rtl-lab">RTL</span>
-          <span className="dir-sep">/</span>
-          <span className="dir-arrow dir-ltr">⟶</span>
-          <span className="dir-label dir-ltr-lab">LTR</span>
-        </div>
-
-        {/* Layer 6 — floating glyphs: Persian, English, LaTeX, code */}
-        <div className="glyph glyph-fa glyph-fa-1">متن فارسی</div>
-        <div className="glyph glyph-fa glyph-fa-2">راست‌چین</div>
-        <div className="glyph glyph-en glyph-en-1">const x = fix()</div>
-        <div className="glyph glyph-en glyph-en-2">useState()</div>
-        <div className="glyph glyph-math glyph-math-1">E = mc²</div>
-        <div className="glyph glyph-math glyph-math-2">∫₀¹ x² dx</div>
-        <div className="glyph glyph-math glyph-math-3">∑ xᵢ²</div>
-        <div className="glyph glyph-latex glyph-latex-1">{"$\\frac{a}{b}$"}</div>
-        <div className="glyph glyph-tag glyph-tag-1">{"<p>"}</div>
-        <div className="glyph glyph-tag glyph-tag-2">{"{ rtl }"}</div>
-        <div className="glyph glyph-url">https://example.com</div>
+        <svg className="net net-mid" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid slice">
+          <SynapseLayer variant={2} />
+        </svg>
+        <svg className="net net-front" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid slice">
+          <SynapseLayer variant={3} />
+        </svg>
       </div>
 
       <section className="app-shell">
