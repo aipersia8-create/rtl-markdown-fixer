@@ -423,7 +423,8 @@ export default function Home() {
         {children}
       </code>
     ),
-    pre: ({ children }) => <pre dir="ltr">{children}</pre>
+    pre: ({ children }) => <pre dir="ltr">{children}</pre>,
+    table: ({ children }) => <table dir={dirFrom(children)}>{children}</table>
   };
 
   const isEmpty = chatEntries.length === 0;

@@ -630,6 +630,8 @@ h1 {
   margin: 0.6em 0;
   border-radius: 12px;
   overflow: hidden;
+  text-align: start;
+  unicode-bidi: isolate;
 }
 .rendered-output th,
 .rendered-output td {
