@@ -587,7 +587,7 @@ h1 {
   margin: 0;
   white-space: pre-wrap;
   line-height: 2;
-  unicode-bidi: plaintext;
+  unicode-bidi: isolate;
 }
 
 .assistant-summary {
@@ -626,7 +626,7 @@ h1 {
 }
 .rendered-output :where(p, li, blockquote, h1, h2, h3, h4, h5, h6) {
   text-align: start;
-  unicode-bidi: plaintext;
+  unicode-bidi: isolate;
 }
 .rendered-output :where(h1, h2, h3, h4) {
   margin: 1.2em 0 0.5em;

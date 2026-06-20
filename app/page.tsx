@@ -72,8 +72,16 @@ function collectText(node: React.ReactNode): string {
   return "";
 }
 
+// Direction from a raw string: RTL if it contains ANY Persian/Arabic letter,
+// otherwise LTR. This is the key rule for mixed content — a sentence is RTL as
+// long as it is not *purely* LTR (e.g. "English at the beginning نباید چپ‌چین شود"
+// starts with English but is RTL because it contains Persian).
+function dirFromString(text: string): "rtl" | "ltr" {
+  return rtlRegex.test(text) ? "rtl" : "ltr";
+}
+
 function dirFrom(children: React.ReactNode): "rtl" | "ltr" {
-  return rtlRegex.test(collectText(children)) ? "rtl" : "ltr";
+  return dirFromString(collectText(children));
 }
 
 function prepareCopy(text: string) {
@@ -597,6 +605,9 @@ export default function Home() {
     h1: ({ children }) => <h1 dir={dirFrom(children)}>{children}</h1>,
     h2: ({ children }) => <h2 dir={dirFrom(children)}>{children}</h2>,
     h3: ({ children }) => <h3 dir={dirFrom(children)}>{children}</h3>,
+    h4: ({ children }) => <h4 dir={dirFrom(children)}>{children}</h4>,
+    h5: ({ children }) => <h5 dir={dirFrom(children)}>{children}</h5>,
+    h6: ({ children }) => <h6 dir={dirFrom(children)}>{children}</h6>,
     blockquote: ({ children }) => <blockquote dir={dirFrom(children)}>{children}</blockquote>,
     a: ({ children, href }) => (
       <a href={href} dir="ltr" target="_blank" rel="noreferrer">
@@ -712,7 +723,9 @@ export default function Home() {
                   </div>
 
                   {entry.role === "user" ? (
-                    <p className="user-text">{entry.content}</p>
+                    <p className="user-text" dir={dirFromString(entry.content)}>
+                      {entry.content}
+                    </p>
                   ) : (
                     <>
                       <div className="assistant-summary">
