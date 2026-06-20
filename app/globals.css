@@ -117,150 +117,59 @@ a {
   flex-direction: column;
 }
 
-/* =====================  3D GLASS ORBS BACKGROUND  ===================== */
-/* Translucent glowing orbs floating in 3 layers of depth. Each layer is tilted
-   differently in 3D and drifts at its own cadence -> real depth. Calm, premium,
-   never noisy. Orbs breathe slowly via float keyframes. */
-.background {
+/* =====================  3D TYPOGRAPHIC GALAXY BACKGROUND  ===================== */
+.typographic-galaxy {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  perspective: 1500px;
-  perspective-origin: 50% 42%;
   overflow: hidden;
-}
-
-/* Layer 0 — deep base gradient */
-.bg-base {
-  position: absolute;
-  inset: 0;
+  isolation: isolate;
   background:
-    radial-gradient(circle at 18% 14%, rgba(124, 58, 237, 0.3), transparent 38rem),
-    radial-gradient(circle at 84% 18%, rgba(34, 211, 238, 0.22), transparent 40rem),
-    radial-gradient(circle at 50% 100%, rgba(20, 241, 149, 0.1), transparent 36rem),
-    linear-gradient(160deg, #02030a 0%, #080d22 50%, #04050f 100%);
+    linear-gradient(150deg, #02030a 0%, #071024 48%, #03040d 100%),
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.035) 0 1px,
+      transparent 1px 92px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.026) 0 1px,
+      transparent 1px 92px
+    );
 }
 
-/* Ambient aurora glow blobs (very slow drift, behind the orbs) */
-.aurora {
-  position: absolute;
-  width: 50vw;
-  height: 50vw;
-  min-width: 380px;
-  min-height: 380px;
-  border-radius: 999px;
-  filter: blur(80px);
-  opacity: 0.24;
-  mix-blend-mode: screen;
-  will-change: transform;
-}
-.aurora-one {
-  top: -18%;
-  right: 2%;
-  background: rgba(124, 58, 237, 0.5);
-  animation: driftA 26s ease-in-out infinite alternate;
-}
-.aurora-two {
-  bottom: -26%;
-  left: 0%;
-  background: rgba(34, 211, 238, 0.42);
-  animation: driftB 30s ease-in-out infinite alternate;
-}
-
-/* The three orb layers. Each is an absolutely-positioned full-bleed SVG,
-   tilted differently in 3D and drifting at a different cadence -> real depth. */
-.orb-layer {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  transform-origin: 50% 50%;
-  transform-style: preserve-3d;
-  will-change: transform;
-}
-/* Back layer: small, faint, far away, slow drift */
-.orb-back {
-  opacity: 0.4;
-  transform: translateZ(-280px) scale(1.12) rotateX(8deg) rotateZ(6deg);
-  animation: orbDriftA 32s ease-in-out infinite alternate;
-  filter: blur(2.5px);
-}
-/* Mid layer: medium brightness */
-.orb-mid {
-  opacity: 0.62;
-  transform: translateZ(-60px) rotateX(4deg) rotateZ(-4deg);
-  animation: orbDriftB 28s ease-in-out infinite alternate;
-  filter: blur(1.2px);
-}
-/* Front layer: crisp foreground, closest to viewer */
-.orb-front {
-  opacity: 0.78;
-  transform: translateZ(90px) rotateX(-3deg) rotateZ(3deg);
-  animation: orbDriftA 36s ease-in-out infinite alternate-reverse;
-}
-
-/* Each orb group floats gently up/down + a touch sideways. */
-.orb-group {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: orbFloat ease-in-out infinite alternate;
-}
-/* The soft outer glow halo breathes in opacity. */
-.orb-halo {
-  animation: orbBreathe ease-in-out infinite alternate;
-}
-/* The glass body keeps a subtle scale breathing. */
-.orb-body {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: orbPulse ease-in-out infinite alternate;
-}
-/* Specular highlight stays put (it reads as a fixed light source). */
-
-/* Slow lateral drift of the whole layer + subtle parallax tilt */
-@keyframes orbDriftA {
-  from { transform: translateZ(-280px) scale(1.12) rotateX(8deg) rotateZ(6deg) translateY(-10px); }
-  to { transform: translateZ(-280px) scale(1.12) rotateX(12deg) rotateZ(10deg) translateY(10px); }
-}
-@keyframes orbDriftB {
-  from { transform: translateZ(-60px) rotateX(4deg) rotateZ(-4deg) translateY(12px); }
-  to { transform: translateZ(-60px) rotateX(0deg) rotateZ(-8deg) translateY(-12px); }
-}
-
-/* Per-orb float: 6–10px movement, slow (driven by inline duration 18–32s) */
-@keyframes orbFloat {
-  from { transform: translate(0, 0); }
-  to { transform: translate(6px, -9px); }
-}
-@keyframes orbBreathe {
-  from { opacity: 0.55; }
-  to { opacity: 0.9; }
-}
-@keyframes orbPulse {
-  from { transform: scale(1); }
-  to { transform: scale(1.04); }
-}
-
-@keyframes driftA {
-  from { transform: translate3d(0, 0, 0) scale(1); }
-  to { transform: translate3d(-30px, 22px, 0) scale(1.08); }
-}
-@keyframes driftB {
-  from { transform: translate3d(0, 0, 0) scale(1); }
-  to { transform: translate3d(28px, -24px, 0) scale(1.1); }
-}
-
-/* Vignette to lift foreground readability, kept above the scene */
-.background::after {
+.typographic-galaxy::before,
+.typographic-galaxy::after {
   content: "";
   position: absolute;
   inset: 0;
-  background:
-    linear-gradient(rgba(255, 255, 255, 0.035), transparent 30%),
-    radial-gradient(circle at center, transparent 0%, rgba(0, 0, 0, 0.5) 88%);
+  pointer-events: none;
 }
 
+.typographic-galaxy::before {
+  z-index: 1;
+  background:
+    linear-gradient(90deg, rgba(139, 92, 246, 0.14), transparent 32%, rgba(34, 211, 238, 0.12)),
+    linear-gradient(0deg, rgba(20, 241, 149, 0.06), transparent 42%);
+  mix-blend-mode: screen;
+}
+
+.typographic-galaxy::after {
+  z-index: 3;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.035), transparent 28%),
+    radial-gradient(ellipse at center, transparent 0%, rgba(0, 0, 0, 0.58) 88%);
+}
+
+.typographic-galaxy-canvas {
+  position: relative;
+  z-index: 2;
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: saturate(1.14) contrast(1.05);
+}
 
 /* =====================  APP SHELL  ===================== */
 .app-shell {
@@ -1250,16 +1159,6 @@ h1 {
   }
   .drawer-tools {
     grid-template-columns: 1fr;
-  }
-  /* Slightly fade + flatten the orb layers on small screens for legibility */
-  .orb-back {
-    opacity: 0.25;
-  }
-  .orb-mid {
-    opacity: 0.48;
-  }
-  .orb-front {
-    opacity: 0.6;
   }
   h1 {
     font-size: 26px;

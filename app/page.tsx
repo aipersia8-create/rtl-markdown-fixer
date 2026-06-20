@@ -7,6 +7,7 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import rehypeSanitize from "rehype-sanitize";
+import { TypographicGalaxyBackground } from "./TypographicGalaxyBackground";
 
 type ChatEntry = {
   id: string;
@@ -108,98 +109,6 @@ function formatDate(value: number) {
   }).format(value);
 }
 /* -------------------------------------------------------- */
-
-/* ---------- Deep 3D glass orbs background ---------- */
-// Translucent glowing orbs floating in 3 layers of depth. Deterministic so SSR
-// matches client render. Each `variant` shifts the cluster for layered parallax.
-//
-// IMPORTANT (hydration): all geometry is pre-rounded to a fixed decimal precision
-// as STRINGS at build time. Floating-point results from Math.sin can differ in the
-// last digit between Node (V8 server) and the browser, which causes a hydration
-// mismatch. Rounding once, up-front, guarantees identical server/client output.
-
-// Round to 1 decimal place and stringify — deterministic across runtimes.
-function f1(v: number) {
-  return Math.round(v * 10) / 10 + "";
-}
-
-// Soft palette per orb (glass tint + glow tint).
-const ORB_TINTS = [
-  { glass: "rgba(167,139,250,0.5)", glow: "rgba(167,139,250,0.45)" },
-  { glass: "rgba(103,232,249,0.5)", glow: "rgba(103,232,249,0.4)" },
-  { glass: "rgba(134,239,172,0.45)", glow: "rgba(134,239,172,0.35)" },
-  { glass: "rgba(196,181,253,0.45)", glow: "rgba(196,181,253,0.4)" }
-];
-
-type BuiltOrb = {
-  cx: string;
-  cy: string;
-  r: string;
-  blur: string;
-  drift: number; // seconds, for animation duration variety
-  glow: string;
-  tint: number;
-};
-type BuiltOrbLayer = BuiltOrb[];
-
-function buildOrbs(variant: number): BuiltOrbLayer {
-  // Cluster of orbs scattered across the field; variant shifts the layout + size.
-  const count = variant === 1 ? 7 : variant === 2 ? 6 : 5;
-  const seedStep = variant * 137.5;
-  const orbs: BuiltOrb[] = [];
-  const w = 100; // viewBox % coordinates
-  const h = 100;
-  for (let i = 0; i < count; i++) {
-    // Deterministic pseudo-random positions in 0..1.
-    const rx = Math.abs(Math.sin((i + 1) * 12.9898 + seedStep) * 43758.5453) % 1;
-    const ry = Math.abs(Math.sin((i + 1) * 78.233 + seedStep * 1.7) * 12543.987) % 1;
-    const rr = Math.abs(Math.sin((i + 1) * 39.346 + seedStep * 0.6) * 24634.123) % 1;
-    const tone = Math.floor(rr * ORB_TINTS.length) % ORB_TINTS.length;
-    // Variant 3 (front) = largest, 1 (back) = smallest, for depth.
-    const sizeBase = variant === 3 ? 9 : variant === 2 ? 6.5 : 4.5;
-    const radius = sizeBase + rr * (variant === 3 ? 11 : 7);
-    orbs.push({
-      cx: f1(rx * w),
-      cy: f1(ry * h),
-      r: f1(radius),
-      blur: f1(radius * 0.18),
-      drift: 18 + ((i * 3.7) % 14), // 18–~32s float cycle
-      glow: f1(radius * 1.7),
-      tint: tone
-    });
-  }
-  return orbs;
-}
-
-// Pre-computed orb clusters per layer (module-level so they are stable).
-const ORB_LAYERS: BuiltOrbLayer[] = [buildOrbs(1), buildOrbs(2), buildOrbs(3)];
-
-function GlassOrbs({ layer = 1 }: { layer?: 1 | 2 | 3 }) {
-  const orbs = ORB_LAYERS[layer - 1];
-  return (
-    <>
-      {orbs.map((o, i) => {
-        const tint = ORB_TINTS[o.tint];
-        return (
-          <g key={`orb${i}`} className="orb-group" style={{ animationDuration: `${o.drift}s`, animationDelay: `${-(i * 1.9)}s` }}>
-            {/* Outer soft glow halo */}
-            <circle cx={o.cx} cy={o.cy} r={o.glow} fill={tint.glow} className="orb-halo" style={{ animationDuration: `${o.drift * 1.3}s` }} />
-            {/* Glass body with inner highlight + glassy fill */}
-            <circle cx={o.cx} cy={o.cy} r={o.r} fill={tint.glass} className="orb-body" style={{ animationDuration: `${o.drift}s` }} />
-            {/* Specular highlight (top-left), gives the glassy 3D feel */}
-            <circle
-              cx={f1(Number(o.cx) - Number(o.r) * 0.32)}
-              cy={f1(Number(o.cy) - Number(o.r) * 0.34)}
-              r={f1(Number(o.r) * 0.26)}
-              fill="rgba(255,255,255,0.7)"
-              className="orb-spec"
-            />
-          </g>
-        );
-      })}
-    </>
-  );
-}
 
 /* ---------- Inline SVG icons (lightweight, crisp) ---------- */
 type IconProps = { className?: string; style?: React.CSSProperties };
@@ -521,25 +430,7 @@ export default function Home() {
 
   return (
     <main className="page">
-      <div className="background" aria-hidden="true">
-        {/* Base deep gradient + ambient glows + readability vignette */}
-        <div className="bg-base" />
-        <div className="aurora aurora-one" />
-        <div className="aurora aurora-two" />
-
-        {/* Deep glass orbs — 3D layer stack (back → front), each tilted in
-            perspective. Layered Z creates real depth; orbs float slowly. */}
-        <svg className="orb-layer orb-back" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice">
-          <GlassOrbs layer={1} />
-        </svg>
-        <svg className="orb-layer orb-mid" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice">
-          <GlassOrbs layer={2} />
-        </svg>
-        <svg className="orb-layer orb-front" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice">
-          <GlassOrbs layer={3} />
-        </svg>
-      </div>
-
+      <TypographicGalaxyBackground />
       <section className="app-shell">
         {/* ---------- TOPBAR ---------- */}
         <header className="topbar">
