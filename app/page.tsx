@@ -109,10 +109,9 @@ function formatDate(value: number) {
 }
 /* -------------------------------------------------------- */
 
-/* ---------- Deep 3D neural network background ---------- */
-// A feed-forward-style graph: columns of neurons connected by glowing synapses,
-// with light "signal" pulses travelling along the edges. Deterministic so SSR
-// matches client render. Each `variant` shifts the layout for layered depth.
+/* ---------- Deep 3D glass orbs background ---------- */
+// Translucent glowing orbs floating in 3 layers of depth. Deterministic so SSR
+// matches client render. Each `variant` shifts the cluster for layered parallax.
 //
 // IMPORTANT (hydration): all geometry is pre-rounded to a fixed decimal precision
 // as STRINGS at build time. Floating-point results from Math.sin can differ in the
@@ -124,184 +123,80 @@ function f1(v: number) {
   return Math.round(v * 10) / 10 + "";
 }
 
-// Tone -> stroke/fill colour tokens.
-const TONE_COLOR = ["#a78bfa", "#67e8f9", "#86efac"];
-const TONE_SOFT = ["rgba(167,139,250,0.5)", "rgba(103,232,249,0.5)", "rgba(134,239,172,0.5)"];
+// Soft palette per orb (glass tint + glow tint).
+const ORB_TINTS = [
+  { glass: "rgba(167,139,250,0.5)", glow: "rgba(167,139,250,0.45)" },
+  { glass: "rgba(103,232,249,0.5)", glow: "rgba(103,232,249,0.4)" },
+  { glass: "rgba(134,239,172,0.45)", glow: "rgba(134,239,172,0.35)" },
+  { glass: "rgba(196,181,253,0.45)", glow: "rgba(196,181,253,0.4)" }
+];
 
-type BuiltNeuron = { x: string; y: string; r: number; tone: 0 | 1 | 2 };
-type BuiltNet = { neurons: BuiltNeuron[]; layers: BuiltNeuron[][] };
+type BuiltOrb = {
+  cx: string;
+  cy: string;
+  r: string;
+  blur: string;
+  drift: number; // seconds, for animation duration variety
+  glow: string;
+  tint: number;
+};
+type BuiltOrbLayer = BuiltOrb[];
 
-function buildNet(variant: number): BuiltNet {
-  // Column x positions with subtle per-variant horizontal drift.
-  const drift = variant * 70 - 70;
-  const cols = [120, 250, 380, 510, 640, 750].map((x) => x + drift);
-  // Neuron counts per column (denser in the middle).
-  const counts = [4, 6, 8, 8, 6, 4];
-  const seedStep = variant * 1000;
-
-  const neurons: BuiltNeuron[] = [];
-  const layers: BuiltNeuron[][] = [];
-
-  cols.forEach((cx, ci) => {
-    const n = counts[ci];
-    const layer: BuiltNeuron[] = [];
-    const span = 460;
-    const start = (500 - span) / 2;
-    for (let i = 0; i < n; i++) {
-      // Pseudo-random but deterministic jitter on Y position + radius.
-      const rnd = Math.abs(Math.sin((ci + 1) * 99.13 + (i + 1) * 53.17 + seedStep));
-      const gap = span / (n + 1);
-      const yRaw = start + gap * (i + 1) + (rnd - 0.5) * 26;
-      const tone = ((ci + i + variant) % 3) as 0 | 1 | 2;
-      const node: BuiltNeuron = {
-        x: f1(cx),
-        y: f1(yRaw),
-        r: Math.round((3 + rnd * 2.4) * 10) / 10,
-        tone
-      };
-      neurons.push(node);
-      layer.push(node);
-    }
-    layers.push(layer);
-  });
-
-  return { neurons, layers };
-}
-
-// Pre-computed nets per variant (module-level so they are stable).
-const NETS: BuiltNet[] = [buildNet(0), buildNet(1), buildNet(2)];
-
-// Connect every neuron to a few neurons in the next column (deterministic).
-function buildEdges(net: BuiltNet) {
-  const edges: { a: BuiltNeuron; b: BuiltNeuron; tone: number }[] = [];
-  for (let li = 0; li < net.layers.length - 1; li++) {
-    const cur = net.layers[li];
-    const next = net.layers[li + 1];
-    cur.forEach((a, ai) => {
-      next.forEach((b, bi) => {
-        const rnd = Math.abs(Math.sin(li * 17.3 + ai * 7.7 + bi * 3.1));
-        // Keep ~55% of possible connections for an organic, non-grid feel.
-        if (rnd > 0.45) {
-          edges.push({ a, b, tone: (li + ai) % 3 });
-        }
-      });
+function buildOrbs(variant: number): BuiltOrbLayer {
+  // Cluster of orbs scattered across the field; variant shifts the layout + size.
+  const count = variant === 1 ? 7 : variant === 2 ? 6 : 5;
+  const seedStep = variant * 137.5;
+  const orbs: BuiltOrb[] = [];
+  const w = 100; // viewBox % coordinates
+  const h = 100;
+  for (let i = 0; i < count; i++) {
+    // Deterministic pseudo-random positions in 0..1.
+    const rx = Math.abs(Math.sin((i + 1) * 12.9898 + seedStep) * 43758.5453) % 1;
+    const ry = Math.abs(Math.sin((i + 1) * 78.233 + seedStep * 1.7) * 12543.987) % 1;
+    const rr = Math.abs(Math.sin((i + 1) * 39.346 + seedStep * 0.6) * 24634.123) % 1;
+    const tone = Math.floor(rr * ORB_TINTS.length) % ORB_TINTS.length;
+    // Variant 3 (front) = largest, 1 (back) = smallest, for depth.
+    const sizeBase = variant === 3 ? 9 : variant === 2 ? 6.5 : 4.5;
+    const radius = sizeBase + rr * (variant === 3 ? 11 : 7);
+    orbs.push({
+      cx: f1(rx * w),
+      cy: f1(ry * h),
+      r: f1(radius),
+      blur: f1(radius * 0.18),
+      drift: 18 + ((i * 3.7) % 14), // 18–~32s float cycle
+      glow: f1(radius * 1.7),
+      tint: tone
     });
   }
-  return edges;
-}
-const EDGES = NETS.map(buildEdges);
-
-// A handful of long paths through consecutive columns for travelling signals.
-function signalPaths(variant: number) {
-  const net = NETS[variant];
-  const paths: { d: string; tone: number; dur: number; delay: number }[] = [];
-  const starts = [0, 1, 2];
-  starts.forEach((rowSeed, idx) => {
-    const pts: string[] = [];
-    let curIdx = rowSeed % net.layers[0].length;
-    net.layers.forEach((layer, li) => {
-      curIdx = (curIdx + li) % layer.length;
-      const node = layer[curIdx];
-      pts.push(`${li === 0 ? "M" : "L"}${node.x},${node.y}`);
-    });
-    paths.push({
-      d: pts.join(" "),
-      tone: (rowSeed + variant) % 3,
-      dur: 7 + idx * 2.5 + variant,
-      delay: -(idx * 2.1 + variant)
-    });
-  });
-  return paths;
+  return orbs;
 }
 
-function SynapseLayer({ variant = 1 }: { variant?: number }) {
-  const v = Math.max(0, Math.min(2, variant - 1));
-  const edges = EDGES[v];
-  const { neurons } = NETS[v];
-  const paths = signalPaths(v);
-  const uid = `b${v}`;
+// Pre-computed orb clusters per layer (module-level so they are stable).
+const ORB_LAYERS: BuiltOrbLayer[] = [buildOrbs(1), buildOrbs(2), buildOrbs(3)];
 
+function GlassOrbs({ layer = 1 }: { layer?: 1 | 2 | 3 }) {
+  const orbs = ORB_LAYERS[layer - 1];
   return (
     <>
-      <defs>
-        <linearGradient id={`edge-${uid}`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor={TONE_SOFT[0]} />
-          <stop offset="50%" stopColor={TONE_SOFT[1]} />
-          <stop offset="100%" stopColor={TONE_SOFT[2]} />
-        </linearGradient>
-        <filter id={`glow-${uid}`} x="-60%" y="-60%" width="220%" height="220%">
-          <feGaussianBlur stdDeviation="2.4" result="b" />
-          <feMerge>
-            <feMergeNode in="b" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-      </defs>
-
-      {/* Synapses */}
-      <g stroke={`url(#edge-${uid})`} strokeWidth={0.8} fill="none" opacity={0.6}>
-        {edges.map((e, i) => (
-          <line
-            key={`e${i}`}
-            x1={e.a.x}
-            y1={e.a.y}
-            x2={e.b.x}
-            y2={e.b.y}
-          />
-        ))}
-      </g>
-
-      {/* Travelling signal pulses along multi-column paths */}
-      <g filter={`url(#glow-${uid})`}>
-        {paths.map((p, i) => (
-          <circle key={`s${i}`} r={3} fill={TONE_COLOR[p.tone]}>
-            <animateMotion
-              dur={`${p.dur}s`}
-              begin={`${p.delay}s`}
-              repeatCount="indefinite"
-              path={p.d}
-              rotate="auto"
+      {orbs.map((o, i) => {
+        const tint = ORB_TINTS[o.tint];
+        return (
+          <g key={`orb${i}`} className="orb-group" style={{ animationDuration: `${o.drift}s`, animationDelay: `${-(i * 1.9)}s` }}>
+            {/* Outer soft glow halo */}
+            <circle cx={o.cx} cy={o.cy} r={o.glow} fill={tint.glow} className="orb-halo" style={{ animationDuration: `${o.drift * 1.3}s` }} />
+            {/* Glass body with inner highlight + glassy fill */}
+            <circle cx={o.cx} cy={o.cy} r={o.r} fill={tint.glass} className="orb-body" style={{ animationDuration: `${o.drift}s` }} />
+            {/* Specular highlight (top-left), gives the glassy 3D feel */}
+            <circle
+              cx={f1(Number(o.cx) - Number(o.r) * 0.32)}
+              cy={f1(Number(o.cy) - Number(o.r) * 0.34)}
+              r={f1(Number(o.r) * 0.26)}
+              fill="rgba(255,255,255,0.7)"
+              className="orb-spec"
             />
-            <animate
-              attributeName="opacity"
-              values="0;1;1;0"
-              keyTimes="0;0.12;0.85;1"
-              dur={`${p.dur}s`}
-              begin={`${p.delay}s`}
-              repeatCount="indefinite"
-            />
-          </circle>
-        ))}
-      </g>
-
-      {/* Neurons with a slow breathing pulse */}
-      <g filter={`url(#glow-${uid})`}>
-        {neurons.map((n, i) => {
-          const rStr = n.r + "";
-          const haloStr = Math.round(n.r * 2.4 * 10) / 10 + "";
-          const pulseStr = Math.round((n.r + 1.1) * 10) / 10 + "";
-          return (
-            <g key={`n${i}`}>
-              <circle cx={n.x} cy={n.y} r={haloStr} fill={TONE_COLOR[n.tone]} opacity={0.16}>
-                <animate
-                  attributeName="opacity"
-                  values="0.08;0.26;0.08"
-                  dur={`${4 + (i % 5)}s`}
-                  repeatCount="indefinite"
-                />
-              </circle>
-              <circle cx={n.x} cy={n.y} r={rStr} fill={TONE_COLOR[n.tone]} className={`neu tone-${n.tone}`}>
-                <animate
-                  attributeName="r"
-                  values={`${rStr};${pulseStr};${rStr}`}
-                  dur={`${3.5 + (i % 4)}s`}
-                  repeatCount="indefinite"
-                />
-              </circle>
-            </g>
-          );
-        })}
-      </g>
+          </g>
+        );
+      })}
     </>
   );
 }
@@ -631,18 +526,17 @@ export default function Home() {
         <div className="bg-base" />
         <div className="aurora aurora-one" />
         <div className="aurora aurora-two" />
-        <div className="aurora aurora-three" />
 
-        {/* Deep neural network — 3D layer stack (back → front), each tilted in perspective.
-            Layered Z creates real depth; light pulses travel along the synapses. */}
-        <svg className="net net-back" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid slice">
-          <SynapseLayer />
+        {/* Deep glass orbs — 3D layer stack (back → front), each tilted in
+            perspective. Layered Z creates real depth; orbs float slowly. */}
+        <svg className="orb-layer orb-back" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice">
+          <GlassOrbs layer={1} />
         </svg>
-        <svg className="net net-mid" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid slice">
-          <SynapseLayer variant={2} />
+        <svg className="orb-layer orb-mid" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice">
+          <GlassOrbs layer={2} />
         </svg>
-        <svg className="net net-front" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid slice">
-          <SynapseLayer variant={3} />
+        <svg className="orb-layer orb-front" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice">
+          <GlassOrbs layer={3} />
         </svg>
       </div>
 

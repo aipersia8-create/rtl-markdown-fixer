@@ -117,16 +117,16 @@ a {
   flex-direction: column;
 }
 
-/* =====================  3D AI NEURAL NETWORK BACKGROUND  ===================== */
-/* A deep, layered, living neural network. Three feed-forward graphs sit at
-   different depths in 3D space, breathing + drifting slowly. Light "signal"
-   pulses travel along the synapses. Calm and premium, never noisy. */
+/* =====================  3D GLASS ORBS BACKGROUND  ===================== */
+/* Translucent glowing orbs floating in 3 layers of depth. Each layer is tilted
+   differently in 3D and drifts at its own cadence -> real depth. Calm, premium,
+   never noisy. Orbs breathe slowly via float keyframes. */
 .background {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  perspective: 1400px;
+  perspective: 1500px;
   perspective-origin: 50% 42%;
   overflow: hidden;
 }
@@ -142,7 +142,7 @@ a {
     linear-gradient(160deg, #02030a 0%, #080d22 50%, #04050f 100%);
 }
 
-/* Ambient aurora glow blobs (very slow drift, behind the nets) */
+/* Ambient aurora glow blobs (very slow drift, behind the orbs) */
 .aurora {
   position: absolute;
   width: 50vw;
@@ -151,7 +151,7 @@ a {
   min-height: 380px;
   border-radius: 999px;
   filter: blur(80px);
-  opacity: 0.26;
+  opacity: 0.24;
   mix-blend-mode: screen;
   will-change: transform;
 }
@@ -159,24 +159,18 @@ a {
   top: -18%;
   right: 2%;
   background: rgba(124, 58, 237, 0.5);
-  animation: driftA 24s ease-in-out infinite alternate;
+  animation: driftA 26s ease-in-out infinite alternate;
 }
 .aurora-two {
   bottom: -26%;
   left: 0%;
   background: rgba(34, 211, 238, 0.42);
-  animation: driftB 28s ease-in-out infinite alternate;
-}
-.aurora-three {
-  top: 30%;
-  left: 32%;
-  background: rgba(20, 241, 149, 0.18);
-  animation: driftA 32s ease-in-out infinite alternate-reverse;
+  animation: driftB 30s ease-in-out infinite alternate;
 }
 
-/* The three neural net layers. Each is an absolutely-positioned full-bleed SVG,
-   tilted differently in 3D and breathing at a different cadence -> real depth. */
-.net {
+/* The three orb layers. Each is an absolutely-positioned full-bleed SVG,
+   tilted differently in 3D and drifting at a different cadence -> real depth. */
+.orb-layer {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -185,37 +179,68 @@ a {
   transform-style: preserve-3d;
   will-change: transform;
 }
-/* Back layer: small, faint, far away, slow spin */
-.net-back {
-  opacity: 0.32;
-  transform: translateZ(-260px) scale(1.05) rotateX(8deg) rotateZ(6deg);
-  animation: netDriftA 30s ease-in-out infinite alternate;
+/* Back layer: small, faint, far away, slow drift */
+.orb-back {
+  opacity: 0.4;
+  transform: translateZ(-280px) scale(1.12) rotateX(8deg) rotateZ(6deg);
+  animation: orbDriftA 32s ease-in-out infinite alternate;
+  filter: blur(2.5px);
 }
-/* Mid layer: the hero net, medium brightness */
-.net-mid {
-  opacity: 0.55;
-  transform: translateZ(-40px) rotateX(4deg) rotateZ(-4deg);
-  animation: netDriftB 26s ease-in-out infinite alternate;
+/* Mid layer: medium brightness */
+.orb-mid {
+  opacity: 0.62;
+  transform: translateZ(-60px) rotateX(4deg) rotateZ(-4deg);
+  animation: orbDriftB 28s ease-in-out infinite alternate;
+  filter: blur(1.2px);
 }
 /* Front layer: crisp foreground, closest to viewer */
-.net-front {
-  opacity: 0.7;
-  transform: translateZ(120px) rotateX(-3deg) rotateZ(3deg);
-  animation: netDriftA 34s ease-in-out infinite alternate-reverse;
+.orb-front {
+  opacity: 0.78;
+  transform: translateZ(90px) rotateX(-3deg) rotateZ(3deg);
+  animation: orbDriftA 36s ease-in-out infinite alternate-reverse;
 }
 
-/* Slow vertical drift of the whole layer + subtle parallax tilt */
-@keyframes netDriftA {
-  from { transform: translateZ(var(--z, 0)) rotateX(8deg) rotateZ(6deg) translateY(-8px); }
-  to { transform: translateZ(var(--z, 0)) rotateX(12deg) rotateZ(10deg) translateY(8px); }
+/* Each orb group floats gently up/down + a touch sideways. */
+.orb-group {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: orbFloat ease-in-out infinite alternate;
 }
-@keyframes netDriftB {
-  from { transform: translateZ(var(--z, 0)) rotateX(4deg) rotateZ(-4deg) translateY(10px); }
-  to { transform: translateZ(var(--z, 0)) rotateX(0deg) rotateZ(-8deg) translateY(-10px); }
+/* The soft outer glow halo breathes in opacity. */
+.orb-halo {
+  animation: orbBreathe ease-in-out infinite alternate;
 }
-.net-back { --z: -260px; }
-.net-mid { --z: -40px; }
-.net-front { --z: 120px; }
+/* The glass body keeps a subtle scale breathing. */
+.orb-body {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: orbPulse ease-in-out infinite alternate;
+}
+/* Specular highlight stays put (it reads as a fixed light source). */
+
+/* Slow lateral drift of the whole layer + subtle parallax tilt */
+@keyframes orbDriftA {
+  from { transform: translateZ(-280px) scale(1.12) rotateX(8deg) rotateZ(6deg) translateY(-10px); }
+  to { transform: translateZ(-280px) scale(1.12) rotateX(12deg) rotateZ(10deg) translateY(10px); }
+}
+@keyframes orbDriftB {
+  from { transform: translateZ(-60px) rotateX(4deg) rotateZ(-4deg) translateY(12px); }
+  to { transform: translateZ(-60px) rotateX(0deg) rotateZ(-8deg) translateY(-12px); }
+}
+
+/* Per-orb float: 6–10px movement, slow (driven by inline duration 18–32s) */
+@keyframes orbFloat {
+  from { transform: translate(0, 0); }
+  to { transform: translate(6px, -9px); }
+}
+@keyframes orbBreathe {
+  from { opacity: 0.55; }
+  to { opacity: 0.9; }
+}
+@keyframes orbPulse {
+  from { transform: scale(1); }
+  to { transform: scale(1.04); }
+}
 
 @keyframes driftA {
   from { transform: translate3d(0, 0, 0) scale(1); }
@@ -1226,15 +1251,15 @@ h1 {
   .drawer-tools {
     grid-template-columns: 1fr;
   }
-  /* Slightly fade + flatten the neural net on small screens for legibility */
-  .net-back {
-    opacity: 0.2;
+  /* Slightly fade + flatten the orb layers on small screens for legibility */
+  .orb-back {
+    opacity: 0.25;
   }
-  .net-mid {
-    opacity: 0.42;
+  .orb-mid {
+    opacity: 0.48;
   }
-  .net-front {
-    opacity: 0.55;
+  .orb-front {
+    opacity: 0.6;
   }
   h1 {
     font-size: 26px;
