@@ -7,6 +7,7 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import rehypeSanitize from "rehype-sanitize";
+import { TypographicGalaxyBackground } from "./TypographicGalaxyBackground";
 
 type ChatEntry = {
   id: string;
@@ -54,6 +55,7 @@ function greet(name: string) {
 
 const introMessage = `سلام! متن فارسی، Markdown، کد، لینک یا فرمولت را بفرست. من خروجی را طوری نمایش می‌دهم که فارسی راست‌به‌چپ بماند و بخش‌های فنی مثل code، URL، email و LaTeX درست چپ‌به‌راست دیده شوند.`;
 
+/* ----- RTL Markdown Fixer core logic (do not break) ----- */
 const rtlRegex = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
 const ltrTokenRegex =
   /(```[\s\S]*?```|`[^`]*`|https?:\/\/[^\s]+|www\.[^\s]+|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|[A-Za-z]:\\[^\s]+|\/[A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=%-]+|[A-Za-z][A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=%-]{1,})/g;
@@ -71,8 +73,16 @@ function collectText(node: React.ReactNode): string {
   return "";
 }
 
+// Direction from a raw string: RTL if it contains ANY Persian/Arabic letter,
+// otherwise LTR. This is the key rule for mixed content — a sentence is RTL as
+// long as it is not *purely* LTR (e.g. "English at the beginning نباید چپ‌چین شود"
+// starts with English but is RTL because it contains Persian).
+function dirFromString(text: string): "rtl" | "ltr" {
+  return rtlRegex.test(text) ? "rtl" : "ltr";
+}
+
 function dirFrom(children: React.ReactNode): "rtl" | "ltr" {
-  return rtlRegex.test(collectText(children)) ? "rtl" : "ltr";
+  return dirFromString(collectText(children));
 }
 
 function prepareCopy(text: string) {
@@ -98,10 +108,92 @@ function formatDate(value: number) {
     minute: "2-digit"
   }).format(value);
 }
+/* -------------------------------------------------------- */
+
+/* ---------- Inline SVG icons (lightweight, crisp) ---------- */
+type IconProps = { className?: string; style?: React.CSSProperties };
+
+function IconHistory({ className, style }: IconProps) {
+  return (
+    <svg className={className} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
+function IconTrash({ className, style }: IconProps) {
+  return (
+    <svg className={className} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h18" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    </svg>
+  );
+}
+function IconSparkles({ className, style }: IconProps) {
+  return (
+    <svg className={className} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3l1.8 4.8L18.6 9.6 13.8 11.4 12 16.2 10.2 11.4 5.4 9.6l4.8-1.8z" />
+      <path d="M19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8z" />
+    </svg>
+  );
+}
+function IconCopy({ className, style }: IconProps) {
+  return (
+    <svg className={className} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+    </svg>
+  );
+}
+function IconCheck({ className, style }: IconProps) {
+  return (
+    <svg className={className} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 6L9 17l-5-5" />
+    </svg>
+  );
+}
+function IconCode({ className, style }: IconProps) {
+  return (
+    <svg className={className} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 18l6-6-6-6" />
+      <path d="M8 6l-6 6 6 6" />
+    </svg>
+  );
+}
+function IconSend({ className, style }: IconProps) {
+  return (
+    <svg className={className} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 2L11 13" />
+      <path d="M22 2l-7 20-4-9-9-4 20-7z" />
+    </svg>
+  );
+}
+function IconPin({ className, style }: IconProps) {
+  return (
+    <svg className={className} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 17v5" />
+      <path d="M9 10.5V4h6v6.5l3 3.5H6l3-3.5z" />
+    </svg>
+  );
+}
+function IconSearch({ className, style }: IconProps) {
+  return (
+    <svg className={className} style={style} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4.3-4.3" />
+    </svg>
+  );
+}
+/* ----------------------------------------------------------- */
+
+const CAPABILITIES = ["Markdown", "LaTeX", "Code LTR", "Persian RTL"];
 
 export default function Home() {
   const [draft, setDraft] = useState("");
   const [toast, setToast] = useState("");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
@@ -169,10 +261,22 @@ export default function Home() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [chatEntries]);
 
-  async function copy(value: string, label: string) {
-    await navigator.clipboard.writeText(value);
-    setToast(`${label} کپی شد`);
-    window.setTimeout(() => setToast(""), 1600);
+  function flashToast(message: string, duration = 1700) {
+    setToast(message);
+    window.setTimeout(() => setToast(""), duration);
+  }
+
+  async function copyValue(value: string, label: string, id?: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      flashToast(`${label} کپی شد`);
+      if (id) {
+        setCopiedId(id);
+        window.setTimeout(() => setCopiedId((cur) => (cur === id ? null : cur)), 1600);
+      }
+    } catch {
+      flashToast("کپی ناموفق بود");
+    }
   }
 
   function createAssistantOutput(input: string) {
@@ -242,6 +346,7 @@ export default function Home() {
     ]);
     setActiveConversationId(null);
     setDraft("");
+    flashToast("گفت‌وگو پاک شد", 1300);
   }
 
   function openConversation(item: Conversation) {
@@ -266,8 +371,7 @@ export default function Home() {
 
     setActiveConversationId(item.id);
     setHistoryOpen(false);
-    setToast("گفت‌وگو باز شد");
-    window.setTimeout(() => setToast(""), 1400);
+    flashToast("گفت‌وگو باز شد", 1300);
   }
 
   function deleteConversation(id: string) {
@@ -305,6 +409,9 @@ export default function Home() {
     h1: ({ children }) => <h1 dir={dirFrom(children)}>{children}</h1>,
     h2: ({ children }) => <h2 dir={dirFrom(children)}>{children}</h2>,
     h3: ({ children }) => <h3 dir={dirFrom(children)}>{children}</h3>,
+    h4: ({ children }) => <h4 dir={dirFrom(children)}>{children}</h4>,
+    h5: ({ children }) => <h5 dir={dirFrom(children)}>{children}</h5>,
+    h6: ({ children }) => <h6 dir={dirFrom(children)}>{children}</h6>,
     blockquote: ({ children }) => <blockquote dir={dirFrom(children)}>{children}</blockquote>,
     a: ({ children, href }) => (
       <a href={href} dir="ltr" target="_blank" rel="noreferrer">
@@ -319,180 +426,204 @@ export default function Home() {
     pre: ({ children }) => <pre dir="ltr">{children}</pre>
   };
 
+  const isEmpty = chatEntries.length === 0;
+
   return (
     <main className="page">
-      <div className="background" aria-hidden="true">
-        <div className="aurora aurora-one" />
-        <div className="aurora aurora-two" />
-        <div className="aurora aurora-three" />
-        <div className="grid-floor" />
-
-        <div className="ring ring-one" />
-        <div className="ring ring-two" />
-
-        <div className="floating-chip chip-one">{"{ code }"}</div>
-        <div className="floating-chip chip-two">∑x²</div>
-        <div className="floating-chip chip-three">π</div>
-        <div className="floating-chip chip-four">AI</div>
-        <div className="floating-chip chip-five">RTL</div>
-
-        <div className="neural-map">
-          <span className="node node-a" />
-          <span className="node node-b" />
-          <span className="node node-c" />
-          <span className="node node-d" />
-          <span className="node node-e" />
-          <span className="edge edge-1" />
-          <span className="edge edge-2" />
-          <span className="edge edge-3" />
-          <span className="edge edge-4" />
-        </div>
-
-        <div className="code-line code-line-one">const output = fixBidi(input)</div>
-        <div className="code-line code-line-two">E = mc²</div>
-        <div className="code-line code-line-three">Markdown + LaTeX + Code</div>
-      </div>
-
+      <TypographicGalaxyBackground />
       <section className="app-shell">
+        {/* ---------- TOPBAR ---------- */}
         <header className="topbar">
-          <div>
-            <span className="eyebrow">Persian RTL Assistant</span>
-            <h1>چت‌بات مرتب‌ساز متن فارسی</h1>
+          <div className="brand">
+            <div className="brand-logo" aria-hidden="true">RTL</div>
+            <div>
+              <span className="eyebrow">
+                <span className="dot" />
+                Persian RTL Assistant
+              </span>
+              <h1>چت‌بات مرتب‌ساز متن فارسی</h1>
+            </div>
           </div>
 
           <div className="top-actions">
             <button className="btn ghost" onClick={() => setHistoryOpen(true)}>
+              <IconHistory className="ico" />
               تاریخچه
               <span className="count">{conversations.length.toLocaleString("fa-IR")}</span>
             </button>
             <button className="btn ghost" onClick={clearChat}>
+              <IconTrash className="ico" />
               پاک کردن گفتگو
             </button>
           </div>
         </header>
 
+        {/* ---------- STATUS ---------- */}
         <div className="status-strip">
-          <div>
+          <div className="stat">
             <span>گفت‌وگوها</span>
             <strong>{stats.chats.toLocaleString("fa-IR")}</strong>
           </div>
-          <div>
+          <div className="stat">
             <span>کاراکتر خروجی</span>
             <strong>{stats.chars.toLocaleString("fa-IR")}</strong>
           </div>
-          <div>
+          <div className="stat">
             <span>خط</span>
             <strong>{stats.lines.toLocaleString("fa-IR")}</strong>
           </div>
-          <div>
+          <div className="stat">
             <span>کلمه</span>
             <strong>{stats.words.toLocaleString("fa-IR")}</strong>
           </div>
         </div>
 
+        {/* ---------- CHAT ---------- */}
         <section className="chat-window" aria-live="polite">
-          {chatEntries.map((entry) => (
-            <article
-              className={`message-row ${entry.role === "user" ? "from-user" : "from-assistant"}`}
-              key={entry.id}
-            >
-              <div className="avatar">
-                {entry.role === "user" ? "تو" : "RTL"}
-              </div>
-
-              <div className="message-bubble">
-                <div className="message-meta">
-                  <span>{entry.role === "user" ? "پیام تو" : "خروجی اصلاح‌شده"}</span>
-                  {entry.createdAt ? <time>{formatDate(entry.createdAt)}</time> : null}
+          {isEmpty ? (
+            <div className="chat-empty">
+              <div className="emoji">👋</div>
+              <h3>گفت‌وگوی خودت را شروع کن</h3>
+              <p>
+                یک متن فارسی، کد، لینک یا فرمول LaTeX بفرست تا با حفظ راست‌چین بودن فارسی و
+                چپ‌چین ماندن بخش‌های فنی، خروجی تمیز و خوانا تحویل بگیری.
+              </p>
+            </div>
+          ) : (
+            chatEntries.map((entry) => (
+              <article
+                className={`message-row ${entry.role === "user" ? "from-user" : "from-assistant"}`}
+                key={entry.id}
+              >
+                <div className="avatar">
+                  {entry.role === "user" ? "تو" : "RTL"}
                 </div>
 
-                {entry.role === "user" ? (
-                  <p className="user-text">{entry.content}</p>
-                ) : (
-                  <>
-                    <div className="assistant-summary">
-                      <span>Markdown</span>
-                      <span>LaTeX</span>
-                      <span>Code LTR</span>
-                      <span>Persian RTL</span>
-                    </div>
+                <div className="message-bubble">
+                  <div className="message-meta">
+                    <span className="role-tag">
+                      {entry.role === "user" ? "🧑‍💻 پیام تو" : "✨ خروجی اصلاح‌شده"}
+                    </span>
+                    {entry.createdAt ? <time>{formatDate(entry.createdAt)}</time> : null}
+                  </div>
 
-                    <div className="rendered-output" id={`render-${entry.id}`}>
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm, remarkMath]}
-                        rehypePlugins={[rehypeSanitize, rehypeKatex]}
-                        components={components}
-                      >
-                        {entry.content}
-                      </ReactMarkdown>
-                    </div>
+                  {entry.role === "user" ? (
+                    <p className="user-text" dir={dirFromString(entry.content)}>
+                      {entry.content}
+                    </p>
+                  ) : (
+                    <>
+                      <div className="assistant-summary">
+                        {CAPABILITIES.map((cap) => (
+                          <span key={cap}>{cap}</span>
+                        ))}
+                      </div>
 
-                    <details className="raw-details">
-                      <summary>نمایش متن خام اصلاح‌شده</summary>
-                      <pre dir="rtl">{prepareCopy(entry.content)}</pre>
-                    </details>
+                      <div className="rendered-output" id={`render-${entry.id}`}>
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm, remarkMath]}
+                          rehypePlugins={[rehypeSanitize, rehypeKatex]}
+                          components={components}
+                        >
+                          {entry.content}
+                        </ReactMarkdown>
+                      </div>
 
-                    <div className="message-actions">
-                      <button className="btn primary" onClick={() => copy(prepareCopy(entry.content), "متن")}>
-                        کپی متن
-                      </button>
-                      <button className="btn" onClick={() => copy(entry.content, "Markdown")}>
-                        کپی Markdown
-                      </button>
-                      <button
-                        className="btn"
-                        onClick={() =>
-                          copy(
-                            document.getElementById(`render-${entry.id}`)?.innerHTML ?? "",
-                            "HTML"
-                          )
-                        }
-                      >
-                        کپی HTML
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </article>
-          ))}
+                      <details className="raw-details">
+                        <summary>نمایش متن خام اصلاح‌شده</summary>
+                        <pre dir="rtl">{prepareCopy(entry.content)}</pre>
+                      </details>
+
+                      <div className="message-actions">
+                        <button
+                          className={`copy-btn ${copiedId === entry.id ? "copied" : ""}`}
+                          onClick={() => copyValue(prepareCopy(entry.content), "متن", entry.id)}
+                          title="کپی متن با کاراکترهای جهت‌دار (پیشنهادی)"
+                        >
+                          {copiedId === entry.id ? (
+                            <IconCheck className="ico" />
+                          ) : (
+                            <IconCopy className="ico" />
+                          )}
+                          {copiedId === entry.id ? "کپی شد" : "کپی متن"}
+                        </button>
+                        <button
+                          className="copy-btn"
+                          onClick={() => copyValue(entry.content, "Markdown")}
+                          title="کپی متن خام Markdown"
+                        >
+                          <IconCode className="ico" />
+                          کپی Markdown
+                        </button>
+                        <button
+                          className="copy-btn"
+                          onClick={() =>
+                            copyValue(
+                              document.getElementById(`render-${entry.id}`)?.innerHTML ?? "",
+                              "HTML"
+                            )
+                          }
+                          title="کپی خروجی HTML رندرشده"
+                        >
+                          <IconCode className="ico" />
+                          کپی HTML
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </article>
+            ))
+          )}
           <div ref={chatEndRef} />
         </section>
 
-        <section className="composer-card">
-          <div className="composer-head">
-            <div>
-              <h2>پیامت را بفرست</h2>
-              <p>متن فارسی، Markdown، کد، لینک، ایمیل یا فرمول LaTeX را وارد کن.</p>
-            </div>
-            <button className="btn ghost" onClick={openSample}>
-              نمونه
-            </button>
-          </div>
+        {/* ---------- COMPOSER (compact chat input) ---------- */}
+        <section className="composer" aria-label="جعبه پیام">
+          <button
+            className="composer-tool"
+            onClick={openSample}
+            title="درج متن نمونه"
+            aria-label="درج متن نمونه"
+          >
+            <IconSparkles className="ico" />
+          </button>
 
-          <div className="composer">
-            <textarea
-              ref={textareaRef}
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
-                  event.preventDefault();
-                  submitMessage();
-                }
-              }}
-              spellCheck={false}
-              placeholder="اینجا بنویس... برای ارسال سریع Ctrl + Enter بزن"
-            />
-            <button className="send-btn" onClick={() => submitMessage()}>
-              ارسال
-            </button>
-          </div>
+          <textarea
+            ref={textareaRef}
+            className="composer-input"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+                event.preventDefault();
+                submitMessage();
+              }
+            }}
+            rows={1}
+            spellCheck={false}
+            placeholder="متن فارسی، کد، لینک یا فرمول LaTeX... (Ctrl + Enter برای ارسال)"
+          />
 
-          <div className="toast">{toast}</div>
+          <button
+            className="send-btn"
+            onClick={() => submitMessage()}
+            disabled={!draft.trim()}
+            aria-label="ارسال"
+            title="ارسال (Ctrl + Enter)"
+          >
+            <IconSend className="send-ico" />
+          </button>
         </section>
       </section>
 
+      {/* ---------- TOAST ---------- */}
+      <div className={`toast ${toast ? "show" : ""}`} role="status">
+        <IconCheck className="ico" />
+        {toast}
+      </div>
+
+      {/* ---------- HISTORY DRAWER ---------- */}
       {historyOpen && (
         <button
           className="drawer-backdrop"
@@ -507,17 +638,33 @@ export default function Home() {
             <h2>تاریخچه گفت‌وگوها</h2>
             <p>همه چیز فقط روی همین مرورگر ذخیره می‌شود.</p>
           </div>
-          <button className="close-btn" onClick={() => setHistoryOpen(false)}>
+          <button className="close-btn" onClick={() => setHistoryOpen(false)} aria-label="بستن">
             ×
           </button>
         </div>
 
-        <div className="drawer-tools">
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="جستجو در گفت‌وگوها..."
-          />
+          <div className="drawer-tools">
+            <div style={{ position: "relative" }}>
+              <IconSearch
+                className="ico"
+                style={{
+                  position: "absolute",
+                  insetInlineStart: "12px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  width: "16px",
+                  height: "16px",
+                  color: "var(--muted)",
+                  pointerEvents: "none"
+                }}
+              />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="جستجو در گفت‌وگوها..."
+              style={{ paddingInlineStart: "38px" }}
+            />
+          </div>
           <button className="btn primary" onClick={() => setQuery("")}>
             پاک کردن جستجو
           </button>
@@ -526,12 +673,22 @@ export default function Home() {
         <div className="history-list">
           {filteredConversations.length === 0 ? (
             <div className="empty-state">
-              هنوز گفت‌وگویی ذخیره نشده یا نتیجه‌ای برای جستجو پیدا نشد.
+              <div className="empty-ico">
+                <IconHistory />
+              </div>
+              <strong>
+                {query ? "نتیجه‌ای پیدا نشد" : "هنوز گفت‌وگویی ذخیره نشده"}
+              </strong>
+              <span>
+                {query
+                  ? "عبارت دیگری را امتحان کن."
+                  : "اولین پیامت را بفرست تا اینجا ذخیره شود."}
+              </span>
             </div>
           ) : (
             filteredConversations.map((item) => (
               <article
-                className={`history-card ${activeConversationId === item.id ? "active" : ""}`}
+                className={`history-card ${activeConversationId === item.id ? "active" : ""} ${item.pinned ? "pinned" : ""}`}
                 key={item.id}
               >
                 <div className="history-content" onClick={() => openConversation(item)}>
@@ -548,7 +705,10 @@ export default function Home() {
                       autoFocus
                     />
                   ) : (
-                    <h3>{item.pinned ? "★ " : ""}{item.title}</h3>
+                    <h3>
+                      {item.pinned && <span className="pin-mark">📌</span>}
+                      {item.title}
+                    </h3>
                   )}
 
                   <p>{item.userContent.slice(0, 130)}</p>
@@ -565,8 +725,12 @@ export default function Home() {
                       تغییر نام
                     </button>
                   )}
-                  <button className="small-btn" onClick={() => togglePin(item.id)}>
-                    {item.pinned ? "برداشتن پین" : "پین"}
+                  <button
+                    className="small-btn"
+                    onClick={() => togglePin(item.id)}
+                    title={item.pinned ? "برداشتن پین" : "پین کردن"}
+                  >
+                    {item.pinned ? "برداشتن پین" : "📌 پین"}
                   </button>
                   <button className="small-btn danger" onClick={() => deleteConversation(item.id)}>
                     حذف
